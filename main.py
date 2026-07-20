@@ -163,18 +163,25 @@ def list_todos(
 
 
 @app.get("/api/tracker")
-def get_tracker(weeks: int = 12):
-    end = date.today()
-    start = end - timedelta(days=weeks * 7 - 1)
+def get_tracker(year: Optional[int] = None, month: Optional[int] = None):
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+    start = date(year, month, 1)
+    next_month = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    end = next_month - timedelta(days=1)
+
     with get_connection() as conn:
         rows = conn.execute(
             """
             SELECT substr(completed_at, 1, 10) AS day, COUNT(*) AS count
             FROM todos
-            WHERE completed_at IS NOT NULL AND substr(completed_at, 1, 10) >= ?
+            WHERE completed_at IS NOT NULL
+              AND substr(completed_at, 1, 10) >= ?
+              AND substr(completed_at, 1, 10) <= ?
             GROUP BY day
             """,
-            (start.isoformat(),),
+            (start.isoformat(), end.isoformat()),
         ).fetchall()
     counts = {row["day"]: row["count"] for row in rows}
     days = []
@@ -183,7 +190,7 @@ def get_tracker(weeks: int = 12):
         iso = cursor_day.isoformat()
         days.append({"date": iso, "count": counts.get(iso, 0)})
         cursor_day += timedelta(days=1)
-    return {"days": days}
+    return {"year": year, "month": month, "days": days}
 
 
 @app.get("/api/groups")

@@ -6,14 +6,14 @@ The standout feature is **Korean natural-language quick entry**: type a sentence
 
 ## Features
 
-- **Basic CRUD** — add, list, complete (strikethrough), delete
+- **Basic CRUD** — add, list, complete (strikethrough), delete. Click a todo's title/time to select it, Shift+click to select a range (Explorer/Finder-style), then bulk-delete the selection
 - **Persistent storage** — a single local SQLite file (`todo.db`), survives restarts
 - **Categories** — 6 built-in presets (exercise / work / study / chores / social / etc.), grouped by color so related categories look alike at a glance. Fully customizable: add your own, rename, change icon/group, or delete — right from the app, no code editing required
 - **Quick natural-language entry (Korean)** — parses relative dates (오늘/내일/모레/글피), weekdays (다음주 화요일), explicit dates (7월 25일), and both 12-hour (오후 3시) and 24-hour (20:30) time notation
 - **Recurring todos** — daily / weekly / biweekly, with an end date and optional exception date ranges (e.g. skip a vacation week). Can be created either through a structured form or the same natural-language input (`매일 9시 약 복용`, `8/3-11/5 격주 공원 산책`)
 - **Search and category filters**
 - **Overdue check** — while the app is open in your browser, it periodically flags anything past its due time that's still unchecked, and lets you mark it done, reschedule it, or snooze it. Optional browser notifications (only fire while the tab is open — there's no background service)
-- **Sidebar** — a month calendar (click a day to filter the list to it) and a GitHub-style heatmap of your completion history
+- **Sidebar** — a month calendar (click a day to filter the list to it) and a circular-cell heatmap of the current month's completions
 - **Google Calendar integration (optional)** — read-only OAuth connection that surfaces upcoming calendar events as suggested todos; nothing is imported until you accept it
 
 ## Requirements

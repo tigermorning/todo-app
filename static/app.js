@@ -55,8 +55,16 @@ const manageCategories = document.getElementById("manage-categories");
 const manageCategoriesList = document.getElementById("manage-categories-list");
 const manageCategoriesClose = document.getElementById("manage-categories-close");
 
+const bulkActions = document.getElementById("bulk-actions");
+const bulkCount = document.getElementById("bulk-count");
+const bulkDeleteBtn = document.getElementById("bulk-delete-btn");
+const bulkClearBtn = document.getElementById("bulk-clear-btn");
+
 let categoriesMap = {};
 let pendingExceptions = [];
+let selectedTodoIds = new Set();
+let lastSelectedIndex = null;
+let currentTodoOrder = [];
 let selectedDate = null;
 
 const WEEKDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
@@ -136,9 +144,12 @@ function formatTimestamp(value) {
 
 function renderTodos(todos) {
   list.innerHTML = "";
+  currentTodoOrder = todos.map((t) => t.id);
   for (const todo of todos) {
     const li = document.createElement("li");
-    li.className = todo.done ? "done" : "";
+    li.className = [todo.done ? "done" : "", selectedTodoIds.has(todo.id) ? "selected" : ""]
+      .filter(Boolean)
+      .join(" ");
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -148,10 +159,12 @@ function renderTodos(todos) {
     const titleSpan = document.createElement("span");
     titleSpan.className = "todo-title";
     titleSpan.textContent = todo.title;
+    titleSpan.addEventListener("click", (e) => selectTodo(todo.id, e.shiftKey));
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "todo-time";
     timeSpan.textContent = formatTimestamp(todo.due_at || todo.created_at);
+    timeSpan.addEventListener("click", (e) => selectTodo(todo.id, e.shiftKey));
 
     li.append(checkbox, titleSpan, timeSpan);
 
@@ -238,9 +251,57 @@ async function toggleTodo(id) {
 
 async function deleteTodo(id) {
   await fetch(`/api/todos/${id}`, { method: "DELETE" });
+  selectedTodoIds.delete(id);
   await fetchTodos();
   await renderCalendar();
 }
+
+function selectTodo(id, shiftKey) {
+  const index = currentTodoOrder.indexOf(id);
+  if (index === -1) return;
+
+  if (shiftKey && lastSelectedIndex !== null) {
+    const [from, to] = [lastSelectedIndex, index].sort((a, b) => a - b);
+    selectedTodoIds = new Set(currentTodoOrder.slice(from, to + 1));
+  } else {
+    selectedTodoIds = new Set([id]);
+    lastSelectedIndex = index;
+  }
+  applySelectionHighlight();
+  updateBulkActionsBar();
+}
+
+function applySelectionHighlight() {
+  document.querySelectorAll("#todo-list li").forEach((li, i) => {
+    const id = currentTodoOrder[i];
+    li.classList.toggle("selected", selectedTodoIds.has(id));
+  });
+}
+
+function updateBulkActionsBar() {
+  bulkActions.hidden = selectedTodoIds.size === 0;
+  bulkCount.textContent = `${selectedTodoIds.size}개 선택됨`;
+}
+
+bulkDeleteBtn.addEventListener("click", async () => {
+  if (selectedTodoIds.size === 0) return;
+  if (!confirm(`선택한 ${selectedTodoIds.size}개 할 일을 삭제할까요?`)) return;
+  await Promise.all(
+    [...selectedTodoIds].map((id) => fetch(`/api/todos/${id}`, { method: "DELETE" }))
+  );
+  selectedTodoIds = new Set();
+  lastSelectedIndex = null;
+  updateBulkActionsBar();
+  await fetchTodos();
+  await renderCalendar();
+});
+
+bulkClearBtn.addEventListener("click", () => {
+  selectedTodoIds = new Set();
+  lastSelectedIndex = null;
+  applySelectionHighlight();
+  updateBulkActionsBar();
+});
 
 async function fetchSuggestions() {
   const res = await fetch("/api/calendar/suggestions");
@@ -366,8 +427,11 @@ calendarClear.addEventListener("click", () => {
 });
 
 async function renderTracker() {
-  const res = await fetch("/api/tracker?weeks=12");
-  const { days } = await res.json();
+  const res = await fetch("/api/tracker");
+  const { year, month, days } = await res.json();
+
+  const trackerHeader = document.getElementById("tracker-header");
+  if (trackerHeader) trackerHeader.textContent = `${year}년 ${month}월 완료 기록`;
 
   trackerGrid.innerHTML = "";
   const firstDate = new Date(`${days[0].date}T00:00:00`);
