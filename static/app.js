@@ -428,8 +428,16 @@ calendarClear.addEventListener("click", () => {
 
 async function renderTracker() {
   const res = await fetch("/api/tracker");
-  const { year, month, days } = await res.json();
+  const data = await res.json();
+  const days = data.days || [];
+  if (days.length === 0) return;
 
+  let { year, month } = data;
+  if (!year || !month) {
+    const fallback = new Date(`${days[0].date}T00:00:00`);
+    year = fallback.getFullYear();
+    month = fallback.getMonth() + 1;
+  }
   const trackerHeader = document.getElementById("tracker-header");
   if (trackerHeader) trackerHeader.textContent = `${year}년 ${month}월 완료 기록`;
 
