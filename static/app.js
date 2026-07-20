@@ -154,6 +154,12 @@ function renderTodos(todos) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = !!todo.done;
+    checkbox.addEventListener("click", (e) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        selectTodo(todo.id, true);
+      }
+    });
     checkbox.addEventListener("change", () => toggleTodo(todo.id));
 
     const titleSpan = document.createElement("span");

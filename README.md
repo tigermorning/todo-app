@@ -6,7 +6,7 @@ The standout feature is **Korean natural-language quick entry**: type a sentence
 
 ## Features
 
-- **Basic CRUD** — add, list, complete (strikethrough), delete. Click a todo's title/time to select it, Shift+click to select a range (Explorer/Finder-style), then bulk-delete the selection
+- **Basic CRUD** — add, list, complete (strikethrough), delete. Click a todo's title/time (or Shift+click its checkbox) to select it; Shift+click a title, time, or checkbox to extend a contiguous range (Explorer/Finder-style), then bulk-delete the selection. A plain click on the checkbox still just toggles done — only Shift+click on it selects
 - **Persistent storage** — a single local SQLite file (`todo.db`), survives restarts
 - **Categories** — 6 built-in presets (exercise / work / study / chores / social / etc.), grouped by color so related categories look alike at a glance. Fully customizable: add your own, rename, change icon/group, or delete — right from the app, no code editing required
 - **Quick natural-language entry (Korean)** — parses relative dates (오늘/내일/모레/글피), weekdays (다음주 화요일), explicit dates (7월 25일), and both 12-hour (오후 3시) and 24-hour (20:30) time notation
