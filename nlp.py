@@ -201,6 +201,62 @@ def _find_date_range(text, now):
     return None, None, None
 
 
+_WEEK_ORDINALS = {"첫": 1, "둘": 2, "셋": 3, "넷": 4, "다섯": 5}
+
+
+def _last_day_of_month(year, month):
+    if month == 12:
+        next_month_first = date(year + 1, 1, 1)
+    else:
+        next_month_first = date(year, month + 1, 1)
+    return (next_month_first - timedelta(days=1)).day
+
+
+def _week_of_month_range(year, month, week_num):
+    last_day = _last_day_of_month(year, month)
+    start_day = (week_num - 1) * 7 + 1
+    if start_day > last_day:
+        return None
+    end_day = min(week_num * 7, last_day)
+    return date(year, month, start_day), date(year, month, end_day)
+
+
+def _find_exception(text, reference_date):
+    """reference_date anchors which year a bare month/week refers to — pass the
+    recurring rule's own resolved start date, not "today", so the exception
+    lands inside the same run as the rule instead of a year in the past."""
+    range_patterns = [
+        re.compile(r"(\d{1,2})\s*/\s*(\d{1,2})\s*[-~]\s*(\d{1,2})\s*/\s*(\d{1,2})\s*제외"),
+        re.compile(
+            r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*부터\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*까지\s*제외"
+        ),
+    ]
+    for pattern in range_patterns:
+        m = pattern.search(text)
+        if not m:
+            continue
+        month1, day1, month2, day2 = (int(g) for g in m.groups())
+        try:
+            start, until = _resolve_date_range(month1, day1, month2, day2, reference_date)
+        except ValueError:
+            continue
+        return (start, until), m.span()
+
+    week_pattern = re.compile(r"(\d{1,2})\s*월\s*(첫|둘|셋|넷|다섯)(?:번째|째)\s*주\s*제외")
+    m = week_pattern.search(text)
+    if m:
+        month = int(m.group(1))
+        week_num = _WEEK_ORDINALS[m.group(2)]
+        year = reference_date.year
+        if date(year, month, 1) < reference_date.replace(day=1):
+            year += 1
+        week_range = _week_of_month_range(year, month, week_num)
+        if week_range:
+            return week_range, m.span()
+
+    return None, None
+
+
 def parse_recurring_quick_entry(text, now=None):
     """Detect a compact recurring expression like "8/3-11/5 격주 공원 산책".
 
@@ -233,6 +289,10 @@ def parse_recurring_quick_entry(text, now=None):
     if start_date is None:
         start_date = now.date()
 
+    exception_range, exception_span = _find_exception(text, start_date)
+    if exception_span:
+        spans.append(exception_span)
+
     title = text
     for start, end in sorted(
         ((s, _consume_trailing_particle(text, e)) for s, e in spans),
@@ -240,6 +300,7 @@ def parse_recurring_quick_entry(text, now=None):
         reverse=True,
     ):
         title = title[:start] + " " + title[end:]
+    title = re.sub(r"\s*,\s*", " ", title)
     title = re.sub(r"\s+", " ", title).strip()
     if not title:
         title = "반복 일정"
@@ -251,4 +312,7 @@ def parse_recurring_quick_entry(text, now=None):
         "start_date": start_date.isoformat(),
         "until_date": until_date.isoformat() if until_date else None,
         "time_of_day": f"{time_value[0]:02d}:{time_value[1]:02d}" if time_value else None,
+        "exceptions": [[exception_range[0].isoformat(), exception_range[1].isoformat()]]
+        if exception_range
+        else [],
     }

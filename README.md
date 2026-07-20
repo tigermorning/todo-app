@@ -65,6 +65,17 @@ Type a sentence in Korean and press Enter. The parser recognizes:
 | `7월 25일에 생일파티` | Title: "생일파티", due July 25 |
 | `매일 9시 약 복용` | Recurring todo, daily at 09:00 — you'll be asked how long to repeat it for |
 | `8/3-11/5 격주 공원 산책` | Recurring todo, biweekly, Aug 3 through Nov 5 |
+| `5/1-9/30 격주로 산책, 9월 첫째주 제외` | Recurring todo, biweekly, May 1–Sep 30, **skipping the 1st week of September** |
+| `5/1-9/30 격주 산책, 9/5-9/12 제외` | Same, but the excluded range is spelled out explicitly instead of by week number |
+
+#### Excluding a period from a recurring todo (in the same sentence)
+
+Add `, <period> 제외` to a recurring quick-entry sentence to skip a stretch of it (e.g. a vacation week) — no need to open the detailed form. Two forms are recognized:
+
+- **A specific date range**: `M/D-M/D 제외` or `M월 D일부터 M월 D일까지 제외`
+- **The Nth week of a month**: `M월 첫째주 제외` / `둘째주` / `셋째주` / `넷째주` / `다섯째주` 제외 (week 1 = days 1–7 of that month, week 2 = days 8–14, and so on)
+
+Only one exclusion clause per sentence is understood. For more than one excluded period, use the detailed input form's "제외 기간 추가" (add exception) button, which accepts as many as you like.
 
 If a category name (e.g. an existing "필라테스" category) appears literally in the text, it's assigned automatically; otherwise the todo falls back to "기타" (misc) and you can change it with one click on its badge.
 
@@ -125,6 +136,7 @@ todo-app/
 - Browser notifications for overdue todos only fire while the app's tab is open — there's no background/always-on notification service.
 - Recurring todos with no end date only materialize 60 days ahead at a time (auto-extended whenever the server restarts); recurring todos *with* an end date are generated in full immediately.
 - The category-matching for quick entry looks for an exact existing category name inside the text — it doesn't infer categories it hasn't seen before.
+- Quick-entry recurrence recognizes at most one `제외` (exclude) clause per sentence. For multiple excluded periods, use the detailed input form instead.
 
 See [PRD.md](PRD.md) for the full history of design decisions, including things that were intentionally left out (and why).
 

@@ -332,6 +332,7 @@ def create_quick_todo(entry: QuickEntryCreate):
                     "interval": recurring["interval"],
                     "start_date": recurring["start_date"],
                     "time_of_day": recurring["time_of_day"],
+                    "exceptions": recurring["exceptions"],
                 }
 
             _validate_recurring_input(
@@ -339,7 +340,7 @@ def create_quick_todo(entry: QuickEntryCreate):
                 recurring["interval"],
                 recurring["start_date"],
                 recurring["until_date"],
-                [],
+                recurring["exceptions"],
             )
             rule_id, inserted = _create_recurring_rule(
                 conn,
@@ -350,7 +351,7 @@ def create_quick_todo(entry: QuickEntryCreate):
                 recurring["time_of_day"],
                 recurring["start_date"],
                 recurring["until_date"],
-                [],
+                recurring["exceptions"],
             )
         return {
             "recurring": True,

@@ -594,7 +594,7 @@ quickRecurringConfirmBtn.addEventListener("click", async () => {
       time_of_day: pendingRecurring.time_of_day,
       start_date: pendingRecurring.start_date,
       until_date: quickRecurringUntil.value,
-      exceptions: [],
+      exceptions: pendingRecurring.exceptions || [],
     }),
   });
   if (!res.ok) {
