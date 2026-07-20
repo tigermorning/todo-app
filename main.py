@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
+import feedparser
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -178,23 +179,63 @@ def get_tracker(year: Optional[int] = None, month: Optional[int] = None):
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT substr(completed_at, 1, 10) AS day, COUNT(*) AS count
+            SELECT substr(due_at, 1, 10) AS day, COUNT(*) AS total, SUM(done) AS done_count
             FROM todos
-            WHERE completed_at IS NOT NULL
-              AND substr(completed_at, 1, 10) >= ?
-              AND substr(completed_at, 1, 10) <= ?
+            WHERE due_at IS NOT NULL
+              AND substr(due_at, 1, 10) >= ?
+              AND substr(due_at, 1, 10) <= ?
             GROUP BY day
             """,
             (start.isoformat(), end.isoformat()),
         ).fetchall()
-    counts = {row["day"]: row["count"] for row in rows}
+    stats = {row["day"]: (row["total"], row["done_count"]) for row in rows}
     days = []
     cursor_day = start
     while cursor_day <= end:
         iso = cursor_day.isoformat()
-        days.append({"date": iso, "count": counts.get(iso, 0)})
+        total, done_count = stats.get(iso, (0, 0))
+        rate = round(done_count / total * 100) if total else 0
+        days.append(
+            {"date": iso, "day": cursor_day.day, "total": total, "done": done_count, "rate": rate}
+        )
         cursor_day += timedelta(days=1)
     return {"year": year, "month": month, "days": days}
+
+
+NEWS_FEEDS = {
+    "politics": ("정치", "https://www.khan.co.kr/rss/rssdata/politic_news.xml"),
+    "economy": ("경제", "https://www.khan.co.kr/rss/rssdata/economy_news.xml"),
+    "society": ("사회", "https://www.khan.co.kr/rss/rssdata/society_news.xml"),
+    "it": ("IT", "https://www.khan.co.kr/rss/rssdata/it_news.xml"),
+    "sports": ("스포츠", "https://www.khan.co.kr/rss/rssdata/kh_sports.xml"),
+    "world": ("세계", "https://www.khan.co.kr/rss/rssdata/world_news.xml"),
+}
+_NEWS_CACHE_TTL = 600
+_news_cache = {}
+
+
+@app.get("/api/news")
+def get_news(category: str = "politics"):
+    if category not in NEWS_FEEDS:
+        raise HTTPException(status_code=400, detail="지원하지 않는 카테고리입니다.")
+
+    cached = _news_cache.get(category)
+    now = datetime.now()
+    if cached and (now - cached["fetched_at"]).total_seconds() < _NEWS_CACHE_TTL:
+        return {"category": category, "articles": cached["articles"]}
+
+    label, url = NEWS_FEEDS[category]
+    feed = feedparser.parse(url)
+    articles = [
+        {
+            "title": entry.get("title", ""),
+            "link": entry.get("link", ""),
+            "published": entry.get("published", ""),
+        }
+        for entry in feed.entries[:10]
+    ]
+    _news_cache[category] = {"fetched_at": now, "articles": articles}
+    return {"category": category, "articles": articles}
 
 
 @app.get("/api/groups")

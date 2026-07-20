@@ -37,6 +37,8 @@ const calendarLabel = document.getElementById("calendar-label");
 const calendarGrid = document.getElementById("calendar-grid");
 const calendarClear = document.getElementById("calendar-clear");
 const trackerGrid = document.getElementById("tracker-grid");
+const newsCategorySelect = document.getElementById("news-category");
+const newsList = document.getElementById("news-list");
 
 const overdueSection = document.getElementById("overdue-section");
 const overdueList = document.getElementById("overdue-list");
@@ -329,6 +331,13 @@ bulkClearBtn.addEventListener("click", () => {
   updateBulkActionsBar();
 });
 
+document.getElementById("select-all-btn").addEventListener("click", () => {
+  selectedTodoIds = new Set(currentTodoOrder);
+  lastSelectedIndex = currentTodoOrder.length - 1;
+  applySelectionHighlight();
+  updateBulkActionsBar();
+});
+
 async function fetchSuggestions() {
   const res = await fetch("/api/calendar/suggestions");
   if (!res.ok) {
@@ -478,14 +487,49 @@ async function renderTracker() {
   for (const d of days) {
     const cell = document.createElement("span");
     cell.className = "tracker-cell";
-    if (d.count >= 7) cell.classList.add("level-4");
-    else if (d.count >= 4) cell.classList.add("level-3");
-    else if (d.count >= 2) cell.classList.add("level-2");
-    else if (d.count >= 1) cell.classList.add("level-1");
-    cell.title = `${d.date}: ${d.count}개 완료`;
+    const rate = d.rate || 0;
+    if (rate >= 100) cell.classList.add("level-5");
+    else if (rate >= 75) cell.classList.add("level-4");
+    else if (rate >= 50) cell.classList.add("level-3");
+    else if (rate >= 25) cell.classList.add("level-2");
+    else if (rate > 0) cell.classList.add("level-1");
+    cell.textContent = d.day;
+    cell.title =
+      d.total > 0
+        ? `${d.date}: ${d.done}/${d.total}개 완료 (${rate}%)`
+        : `${d.date}: 마감된 할 일 없음`;
     trackerGrid.appendChild(cell);
   }
 }
+
+async function renderNews() {
+  const category = newsCategorySelect.value;
+  newsList.innerHTML = "<li class='news-loading'>불러오는 중...</li>";
+  try {
+    const res = await fetch(`/api/news?category=${encodeURIComponent(category)}`);
+    const data = await res.json();
+    const articles = data.articles || [];
+    newsList.innerHTML = "";
+    if (articles.length === 0) {
+      newsList.innerHTML = "<li class='news-empty'>기사를 불러오지 못했습니다.</li>";
+      return;
+    }
+    for (const article of articles) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = article.link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = article.title;
+      li.appendChild(a);
+      newsList.appendChild(li);
+    }
+  } catch (err) {
+    newsList.innerHTML = "<li class='news-empty'>기사를 불러오지 못했습니다.</li>";
+  }
+}
+
+newsCategorySelect.addEventListener("change", () => renderNews());
 
 const notifiedIds = new Set();
 
@@ -936,6 +980,7 @@ categoryFilter.addEventListener("change", () => fetchTodos());
   await fetchSuggestions();
   await renderCalendar();
   await renderTracker();
+  await renderNews();
   await checkOverdue();
   setInterval(checkOverdue, 60000);
 })();

@@ -7,16 +7,18 @@ The standout feature is **Korean natural-language quick entry**: type a sentence
 ## Features
 
 - **Basic CRUD** — add, list, complete (strikethrough), delete
-- **Multi-select** — click a todo's title or time to select it; Shift+click a title, time, or checkbox extends a contiguous range (Explorer/Finder-style). With 2+ items selected:
-  - the **bulk-actions bar** above the list lets you delete the whole selection at once
-  - **checking or unchecking any selected item's checkbox marks the entire selection done/undone together** — not just that one row (a plain click on a checkbox when nothing else is selected still just toggles that single item, as usual; only Shift+click on a checkbox adds it to a selection instead of toggling it)
+- **Multi-select** — **you must click a todo's title or time text to select it** (the checkbox alone does not start a selection — a plain click on it just toggles done, like always). Once something is selected:
+  - **Shift+click** another title, time, or checkbox extends a contiguous range from the last-selected item (Explorer/Finder-style)
+  - **전체 선택** (select all) above the list selects every currently-visible todo in one click
+  - the **bulk-actions bar** that appears lets you delete the whole selection, or clear it
+  - **checking/unchecking any selected item's checkbox applies to the entire selection**, not just that row
 - **Persistent storage** — a single local SQLite file (`todo.db`), survives restarts
 - **Categories** — 6 built-in presets (exercise / work / study / chores / social / etc.), grouped by color so related categories look alike at a glance. Fully customizable: add your own, rename, change icon/group, or delete — right from the app, no code editing required
 - **Quick natural-language entry (Korean)** — parses relative dates (오늘/내일/모레/글피), weekdays (다음주 화요일), explicit dates (7월 25일), and both 12-hour (오후 3시) and 24-hour (20:30) time notation
 - **Recurring todos** — daily / weekly / biweekly, with an end date and optional exception date ranges (e.g. skip a vacation week). Can be created either through a structured form or the same natural-language input (`매일 9시 약 복용`, `8/3-11/5 격주 공원 산책`)
 - **Search and category filters**
 - **Overdue check** — while the app is open in your browser, it periodically flags anything past its due time that's still unchecked, and lets you mark it done, reschedule it, or snooze it. Optional browser notifications (only fire while the tab is open — there's no background service)
-- **Sidebar** — a month calendar (click a day to filter the list to it) and a circular-cell heatmap of the current month's completions
+- **Sidebar** — a month calendar (click a day to filter the list to it), a circular-cell heatmap of the current month's completions (darker = higher completion rate that day, with the date number shown on each cell), and a category-filtered news headline widget (politics/economy/society/IT/sports/world, from 경향신문's public RSS feeds — no API key required)
 - **Google Calendar integration (optional)** — read-only OAuth connection that surfaces upcoming calendar events as suggested todos; nothing is imported until you accept it
 
 ## Requirements
@@ -49,10 +51,14 @@ Install dependencies and run:
 
 ```bash
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --reload-exclude=venv/* --reload-exclude=__pycache__/*
 ```
 
 Open **http://localhost:8000** in your browser. That's it — the SQLite database and all category presets are created automatically on first run.
+
+On Windows you can just double-click **`start.bat`** instead — it activates the virtual environment and runs the same command.
+
+> **Why `--reload-exclude`?** Without it, `--reload` watches every file inside `venv/` too. Any background write inside the virtual environment (pip's own bookkeeping, cache files, etc.) can trigger a reload storm that makes the server look like it's "randomly crashing" or refusing connections. The flags above tell it to only watch your actual source files. Note the `=` — `--reload-exclude venv/*` (space instead of `=`) does not reliably parse in some shells.
 
 ## How to use it
 
@@ -98,7 +104,8 @@ Click "상세 입력" to expand a form with an explicit title field, category pi
 ### Sidebar
 
 - **Calendar**: dots mark days with something due; click a day to filter the list to it, click "전체 보기" to clear the filter.
-- **Heatmap**: darker cells mean more completions that day, computed from the last 12 weeks.
+- **Tracker**: one cell per day of the current month, labeled with its date number. The color darkens as that day's completion rate (완료 개수 / 마감된 할 일 개수) increases — a day with nothing due stays uncolored.
+- **News**: pick a category (정치/경제/사회/IT/스포츠/세계) from the dropdown to see its 10 most recent headlines from 경향신문's public RSS feed. Click a headline to open the article in a new tab. Headlines are cached for 10 minutes per category to avoid re-fetching on every page load.
 
 ### Overdue check
 
@@ -130,6 +137,7 @@ todo-app/
 ├── recurring.py               # Recurring-rule occurrence generation (dateutil.rrule)
 ├── calendar_sync.py           # Google Calendar API client (read-only)
 ├── setup_google_calendar.py   # One-time OAuth setup script (run this yourself)
+├── start.bat                  # Windows: activates venv and runs the server
 ├── requirements.txt
 ├── .env.example
 ├── static/

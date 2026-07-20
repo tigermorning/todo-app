@@ -25,6 +25,19 @@
       <div id="tracker-header">완료 기록</div>
       <div id="tracker-grid"></div>
     </div>
+    <div id="news-widget">
+      <div id="news-header">
+        <select id="news-category">
+          <option value="politics">정치</option>
+          <option value="economy">경제</option>
+          <option value="society">사회</option>
+          <option value="it">IT</option>
+          <option value="sports">스포츠</option>
+          <option value="world">세계</option>
+        </select>
+      </div>
+      <ul id="news-list"></ul>
+    </div>
   </aside>
   <main>
     <h1>내 할 일</h1>
@@ -123,6 +136,9 @@
       <select id="category-filter">
         <option value="">전체 카테고리</option>
       </select>
+    </div>
+    <div id="select-all-row">
+      <button type="button" id="select-all-btn">전체 선택</button>
     </div>
     <div id="bulk-actions" hidden>
       <span id="bulk-count"></span>
