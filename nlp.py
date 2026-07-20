@@ -158,14 +158,23 @@ def parse_quick_entry(text, now=None):
 
 
 _FREQUENCY_WORDS = [("격주", "WEEKLY", 2), ("매주", "WEEKLY", 1), ("매일", "DAILY", 1)]
+_WEEKDAY_MARDA = re.compile(r"([월화수목금토일])\s*요일\s*마다")
 
 
 def _find_recurring_frequency(text):
+    """Returns (freq, interval, span, weekday_bias). weekday_bias is the
+    0=Mon..6=Sun index when the trigger was "{weekday}요일마다" (e.g. "수요일마다")
+    — a bare weekday alone (no 마다/매주/etc.) is intentionally NOT treated as
+    recurring, since "화요일에 병원" usually means a single upcoming visit, not
+    a standing weekly one."""
+    m = _WEEKDAY_MARDA.search(text)
+    if m:
+        return "WEEKLY", 1, m.span(), WEEKDAY_MAP[m.group(1)]
     for word, freq, interval in _FREQUENCY_WORDS:
         m = re.search(word, text)
         if m:
-            return freq, interval, m.span()
-    return None, None, None
+            return freq, interval, m.span(), None
+    return None, None, None, None
 
 
 def _resolve_date_range(month1, day1, month2, day2, today):
@@ -260,14 +269,15 @@ def _find_exception(text, reference_date):
 def parse_recurring_quick_entry(text, now=None):
     """Detect a compact recurring expression like "8/3-11/5 격주 공원 산책".
 
-    Returns None if no recurring-frequency keyword (매일/매주/격주) is found — the
-    caller should fall back to parse_quick_entry() for a normal single todo.
+    Returns None if no recurring-frequency keyword (매일/매주/격주/{요일}마다) is
+    found — the caller should fall back to parse_quick_entry() for a normal
+    single todo.
     Otherwise returns a dict: title, freq, interval, start_date, until_date, time_of_day.
     """
     now = now or datetime.now()
     text = text.strip()
 
-    freq, interval, freq_span = _find_recurring_frequency(text)
+    freq, interval, freq_span, weekday_bias = _find_recurring_frequency(text)
     if freq is None:
         return None
 
@@ -276,6 +286,9 @@ def parse_recurring_quick_entry(text, now=None):
     spans = [freq_span]
     if range_span:
         spans.append(range_span)
+    elif weekday_bias is not None:
+        today = now.date()
+        start_date = today + timedelta(days=(weekday_bias - today.weekday()) % 7)
     else:
         single_date, single_span = _find_date(text, now)
         if single_date:

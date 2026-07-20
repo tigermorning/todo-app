@@ -67,6 +67,11 @@ Type a sentence in Korean and press Enter. The parser recognizes:
 | `8/3-11/5 격주 공원 산책` | Recurring todo, biweekly, Aug 3 through Nov 5 |
 | `5/1-9/30 격주로 산책, 9월 첫째주 제외` | Recurring todo, biweekly, May 1–Sep 30, **skipping the 1st week of September** |
 | `5/1-9/30 격주 산책, 9/5-9/12 제외` | Same, but the excluded range is spelled out explicitly instead of by week number |
+| `수요일마다 산책` | Recurring todo, weekly, every Wednesday — you'll be asked how long to repeat it for |
+
+#### A trigger word is required for anything recurring
+
+`화요일에 병원` (just a bare weekday, no trigger word) is treated as a **single** upcoming appointment on the next Tuesday — not a standing weekly one. This is deliberate: most weekday mentions like that mean "this one time," not "every week." To make something recurring, include one of: `매일` (daily), `매주` (weekly), `격주` (biweekly), a date range (`M/D-M/D`), or `{weekday}요일마다` (e.g. `수요일마다`, "every Wednesday").
 
 #### Excluding a period from a recurring todo (in the same sentence)
 
@@ -84,6 +89,8 @@ Non-Korean speakers can skip natural-language entry entirely and use the date/ti
 ### Detailed input
 
 Click "상세 입력" to expand a form with an explicit title field, category picker (including "⚙ 카테고리 관리" to rename/delete/edit categories), a date+time picker, and recurrence settings (daily/weekly/biweekly, required end date, optional exception date ranges).
+
+**Note:** the title field here is used exactly as typed — it does not run through the natural-language parser. If you type a description like "수요일 산책, 9월 첫째주 제외" into this title field, it becomes the literal todo title; the date/recurrence/exception fields are the actual controls that determine when it repeats. Natural-language parsing only happens in the quick-add box at the top.
 
 ### Sidebar
 
