@@ -113,6 +113,10 @@ class TodoDueAtUpdate(BaseModel):
     due_at: str
 
 
+class TodoDoneUpdate(BaseModel):
+    done: bool
+
+
 class AcceptSuggestion(BaseModel):
     event_id: str
     title: str
@@ -422,6 +426,20 @@ def toggle_todo(todo_id: int):
             "UPDATE todos SET done = ?, completed_at = ? WHERE id = ?",
             (new_done, completed_at, todo_id),
         )
+    return {"id": todo_id, "done": new_done}
+
+
+@app.patch("/api/todos/{todo_id}/done")
+def set_todo_done(todo_id: int, update: TodoDoneUpdate):
+    new_done = 1 if update.done else 0
+    completed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if new_done else None
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE todos SET done = ?, completed_at = ? WHERE id = ?",
+            (new_done, completed_at, todo_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="해당 할 일을 찾을 수 없습니다.")
     return {"id": todo_id, "done": new_done}
 
 

@@ -160,7 +160,13 @@ function renderTodos(todos) {
         selectTodo(todo.id, true);
       }
     });
-    checkbox.addEventListener("change", () => toggleTodo(todo.id));
+    checkbox.addEventListener("change", () => {
+      if (selectedTodoIds.size > 1 && selectedTodoIds.has(todo.id)) {
+        bulkSetDone([...selectedTodoIds], checkbox.checked);
+      } else {
+        toggleTodo(todo.id);
+      }
+    });
 
     const titleSpan = document.createElement("span");
     titleSpan.className = "todo-title";
@@ -251,6 +257,20 @@ async function setTodoCategory(id, category) {
 
 async function toggleTodo(id) {
   await fetch(`/api/todos/${id}/toggle`, { method: "PATCH" });
+  await fetchTodos();
+  await renderTracker();
+}
+
+async function bulkSetDone(ids, done) {
+  await Promise.all(
+    ids.map((id) =>
+      fetch(`/api/todos/${id}/done`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done }),
+      })
+    )
+  );
   await fetchTodos();
   await renderTracker();
 }
