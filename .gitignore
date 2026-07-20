@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+
+.env
+todo.db
+
+# 구글 캘린더 OAuth 관련 — 실제 비밀값/토큰이 들어있어 항상 제외
+credentials.json
+token.json

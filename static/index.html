@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>내 할 일</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="app-layout">
+  <aside id="sidebar">
+    <div id="mini-calendar">
+      <div id="calendar-header">
+        <button type="button" id="calendar-prev">◀</button>
+        <span id="calendar-label"></span>
+        <button type="button" id="calendar-next">▶</button>
+      </div>
+      <div id="calendar-weekdays">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div id="calendar-grid"></div>
+      <button type="button" id="calendar-clear" hidden>전체 보기</button>
+    </div>
+    <div id="tracker">
+      <div id="tracker-header">완료 기록</div>
+      <div id="tracker-grid"></div>
+    </div>
+  </aside>
+  <main>
+    <h1>내 할 일</h1>
+
+    <div id="overdue-section" hidden>
+      <h2>확인이 필요한 지난 할 일</h2>
+      <button type="button" id="enable-notifications">🔔 알림 켜기</button>
+      <ul id="overdue-list"></ul>
+    </div>
+
+    <form id="quick-form">
+      <input type="text" id="quick-input" placeholder="예: 내일 오후 1시에 네일숍" autocomplete="off" required />
+      <button type="submit">추가</button>
+    </form>
+
+    <div id="quick-recurring-confirm" hidden>
+      <p id="quick-recurring-summary"></p>
+      <div class="field-row">
+        <label for="quick-recurring-until">언제까지 반복할까요?</label>
+        <input type="date" id="quick-recurring-until" />
+      </div>
+      <div class="field-row">
+        <button type="button" class="preset-btn" data-months="1">+1개월</button>
+        <button type="button" class="preset-btn" data-months="3">+3개월</button>
+        <button type="button" class="preset-btn" data-months="6">+6개월</button>
+      </div>
+      <div class="field-row">
+        <button type="button" id="quick-recurring-confirm-btn">확인</button>
+        <button type="button" id="quick-recurring-cancel-btn">취소</button>
+      </div>
+    </div>
+
+    <button type="button" id="toggle-detailed">상세 입력 ▾</button>
+
+    <div id="detailed-section" hidden>
+      <form id="todo-form">
+        <input type="text" id="todo-input" placeholder="할 일을 입력하세요" autocomplete="off" />
+        <select id="category-select">
+          <option value="">카테고리 없음</option>
+          <option value="__new__">+ 새 카테고리</option>
+          <option value="__manage__">⚙ 카테고리 관리</option>
+        </select>
+
+        <div class="field-row">
+          <input type="date" id="due-date-input" />
+          <input type="time" id="due-time-input" />
+        </div>
+
+        <div class="field-row">
+          <label for="recurrence-select">반복</label>
+          <select id="recurrence-select">
+            <option value="">반복 안함</option>
+            <option value="DAILY:1">매일</option>
+            <option value="WEEKLY:1">매주</option>
+            <option value="WEEKLY:2">격주</option>
+          </select>
+        </div>
+
+        <div id="recurrence-options" hidden>
+          <div class="field-row">
+            <label for="recurrence-until">종료일</label>
+            <input type="date" id="recurrence-until" />
+          </div>
+          <div class="field-row">
+            <input type="date" id="exception-start" />
+            <input type="date" id="exception-end" />
+            <button type="button" id="add-exception">제외 기간 추가</button>
+          </div>
+          <ul id="exception-list"></ul>
+        </div>
+
+        <button type="submit">추가</button>
+      </form>
+
+      <div id="new-category-form" hidden>
+        <input type="text" id="new-category-name" placeholder="카테고리 이름" autocomplete="off" />
+        <input type="text" id="new-category-icon" placeholder="아이콘(선택, 이모지)" autocomplete="off" maxlength="4" />
+        <select id="new-category-group"></select>
+        <button type="button" id="new-category-save">저장</button>
+        <button type="button" id="new-category-cancel">취소</button>
+      </div>
+
+      <div id="manage-categories" hidden>
+        <ul id="manage-categories-list"></ul>
+        <button type="button" id="manage-categories-close">닫기</button>
+      </div>
+    </div>
+
+    <div id="suggestions-section" hidden>
+      <h2>제안된 할 일 (구글 캘린더)</h2>
+      <ul id="suggestions-list"></ul>
+    </div>
+
+    <div id="filter-bar">
+      <input type="text" id="search-input" placeholder="검색" autocomplete="off" />
+      <select id="category-filter">
+        <option value="">전체 카테고리</option>
+      </select>
+    </div>
+    <ul id="todo-list"></ul>
+  </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

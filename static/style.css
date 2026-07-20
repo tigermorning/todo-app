@@ -1,0 +1,835 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+  margin: 0;
+}
+
+#app-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 760px;
+}
+
+#sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+main {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+#mini-calendar,
+#tracker {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+#calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+#calendar-header button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6e6e73;
+  font-size: 0.8rem;
+}
+
+#calendar-weekdays,
+#calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+#calendar-weekdays {
+  font-size: 0.65rem;
+  color: #86868b;
+  margin-bottom: 2px;
+}
+
+.calendar-day {
+  position: relative;
+  padding: 0.35rem 0;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+}
+
+.calendar-day:hover {
+  background: #f0f0f2;
+}
+
+.calendar-day.empty {
+  cursor: default;
+}
+
+.calendar-day.empty:hover {
+  background: none;
+}
+
+.calendar-day.today {
+  font-weight: 500;
+  color: #0071e3;
+}
+
+.calendar-day.selected {
+  background: #0071e3;
+  color: #fff;
+}
+
+.calendar-day .dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #0071e3;
+}
+
+.calendar-day.selected .dot {
+  background: #fff;
+}
+
+#calendar-clear {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.35rem;
+  border: none;
+  border-radius: 6px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+#tracker-header {
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #6e6e73;
+}
+
+#tracker-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.tracker-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: #ebedf0;
+}
+
+.tracker-cell.empty {
+  background: transparent;
+}
+
+.tracker-cell.level-1 { background: #c6e6c3; }
+.tracker-cell.level-2 { background: #7bc96f; }
+.tracker-cell.level-3 { background: #45a041; }
+.tracker-cell.level-4 { background: #2b6e2b; }
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 1rem;
+}
+
+#overdue-section {
+  background: #fff4e5;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+}
+
+#overdue-section[hidden] {
+  display: none;
+}
+
+#overdue-section h2 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #b26a00;
+  margin: 0 0 0.5rem;
+  display: inline-block;
+}
+
+#enable-notifications {
+  float: right;
+  border: none;
+  background: none;
+  font-size: 0.75rem;
+  color: #b26a00;
+  cursor: pointer;
+}
+
+#overdue-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  clear: both;
+}
+
+.overdue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.overdue-item .overdue-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.overdue-item .overdue-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.overdue-item button {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.overdue-item .btn-complete {
+  background: #34c759;
+  color: #fff;
+}
+
+.overdue-item .btn-reschedule {
+  background: #0071e3;
+  color: #fff;
+}
+
+.overdue-item .btn-snooze {
+  background: #e8e8ed;
+  color: #1d1d1f;
+}
+
+.overdue-item .reschedule-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+#suggestions-section {
+  background: #eef6ff;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+}
+
+#suggestions-section[hidden] {
+  display: none;
+}
+
+#suggestions-section h2 {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #0071e3;
+  margin: 0 0 0.5rem;
+}
+
+#suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#suggestions-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+#suggestions-list li button {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: #0071e3;
+  color: #fff;
+}
+
+#suggestions-list li button.delete-btn {
+  background: none;
+  color: #ff3b30;
+}
+
+#quick-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+#quick-input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 0;
+}
+
+#toggle-detailed {
+  border: none;
+  background: none;
+  color: #0071e3;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 0 1rem;
+}
+
+#quick-recurring-confirm {
+  background: #eef6ff;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#quick-recurring-confirm[hidden] {
+  display: none;
+}
+
+#quick-recurring-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.preset-btn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+#quick-recurring-until {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+#quick-recurring-confirm-btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background: #0071e3;
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+#quick-recurring-cancel-btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+#detailed-section {
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+#detailed-section[hidden] {
+  display: none;
+}
+
+#todo-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.field-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.field-row label {
+  font-size: 0.85rem;
+  color: #6e6e73;
+  white-space: nowrap;
+}
+
+#todo-input {
+  flex: 2;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 0;
+}
+
+#due-date-input,
+#due-time-input,
+#recurrence-select,
+#recurrence-until,
+#exception-start,
+#exception-end {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 0;
+  background: #fff;
+}
+
+#add-exception {
+  padding: 0.5rem 0.7rem;
+  border: none;
+  border-radius: 8px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#exception-list {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: #6e6e73;
+}
+
+#exception-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+}
+
+#recurrence-options[hidden] {
+  display: none;
+}
+
+#recurrence-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+#category-select {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 0;
+  background: #fff;
+}
+
+#new-category-form {
+  display: flex;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1rem;
+  flex-wrap: wrap;
+}
+
+#manage-categories {
+  margin: -0.5rem 0 1rem;
+  background: #f5f5f7;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+#manage-categories[hidden] {
+  display: none;
+}
+
+#manage-categories-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.manage-category-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.manage-category-row input[type="text"] {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.manage-category-row .cat-icon-input {
+  width: 2.4rem;
+}
+
+.manage-category-row .cat-name-input {
+  flex: 1;
+}
+
+.manage-category-row select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.manage-category-row button {
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.manage-category-row .cat-save-btn {
+  background: #0071e3;
+  color: #fff;
+}
+
+.manage-category-row .cat-delete-btn {
+  background: none;
+  color: #ff3b30;
+}
+
+#manage-categories-close {
+  padding: 0.35rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: #e8e8ed;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+#new-category-form[hidden] {
+  display: none;
+}
+
+#new-category-name,
+#new-category-icon {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+#new-category-name {
+  flex: 2;
+}
+
+#new-category-icon {
+  flex: 1;
+  width: 5rem;
+}
+
+#new-category-group {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+#new-category-save,
+#new-category-cancel {
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+#new-category-save {
+  background: #0071e3;
+  color: #fff;
+}
+
+#new-category-cancel {
+  background: #e8e8ed;
+  color: #1d1d1f;
+}
+
+#filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+#search-input {
+  flex: 2;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+#category-filter {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 0;
+  background: #fff;
+}
+
+#todo-form button {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #0071e3;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#todo-form button:hover {
+  background: #0060c2;
+}
+
+#todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#todo-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.4rem;
+  border-bottom: 1px solid #eee;
+}
+
+#todo-list li .todo-title {
+  flex: 1;
+  word-break: break-word;
+}
+
+#todo-list li.done .todo-title {
+  text-decoration: line-through;
+  color: #86868b;
+}
+
+.todo-time {
+  font-size: 0.75rem;
+  color: #86868b;
+  white-space: nowrap;
+}
+
+.category-badge {
+  font-size: 0.75rem;
+  color: #fff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.recur-badge {
+  font-size: 0.85rem;
+}
+
+.category-prompt-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px dashed #c7c7cc;
+  background: none;
+  color: #86868b;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.category-prompt select {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid #d2d2d7;
+}
+
+.delete-btn {
+  border: none;
+  background: none;
+  color: #ff3b30;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #1c1c1e;
+    color: #f5f5f7;
+  }
+  main,
+  #mini-calendar,
+  #tracker {
+    background: #2c2c2e;
+    box-shadow: none;
+  }
+  .calendar-day:hover {
+    background: #3a3a3c;
+  }
+  #calendar-weekdays,
+  #tracker-header {
+    color: #98989d;
+  }
+  #calendar-clear {
+    background: #48484a;
+    color: #f5f5f7;
+  }
+  .tracker-cell {
+    background: #2d333b;
+  }
+  #overdue-section {
+    background: #4a3418;
+  }
+  #overdue-section h2,
+  #enable-notifications {
+    color: #f0a840;
+  }
+  #todo-input,
+  #quick-input,
+  #category-select,
+  #search-input,
+  #category-filter,
+  #new-category-name,
+  #new-category-icon,
+  #new-category-group,
+  #due-date-input,
+  #due-time-input,
+  #recurrence-select,
+  #recurrence-until,
+  #exception-start,
+  #exception-end {
+    background: #3a3a3c;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  #new-category-cancel,
+  #add-exception,
+  #manage-categories-close {
+    background: #48484a;
+    color: #f5f5f7;
+  }
+  #manage-categories {
+    background: #3a3a3c;
+  }
+  .manage-category-row input[type="text"],
+  .manage-category-row select {
+    background: #2c2c2e;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  #detailed-section {
+    border-color: #3a3a3c;
+  }
+  .field-row label,
+  #exception-list {
+    color: #98989d;
+  }
+  #todo-list li {
+    border-color: #3a3a3c;
+  }
+  .category-prompt-btn {
+    border-color: #48484a;
+    color: #98989d;
+  }
+  .category-prompt select {
+    background: #3a3a3c;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  #quick-recurring-confirm {
+    background: #1e3a5f;
+  }
+  .preset-btn,
+  #quick-recurring-until {
+    background: #3a3a3c;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  #quick-recurring-cancel-btn {
+    background: #48484a;
+    color: #f5f5f7;
+  }
+  .todo-time {
+    color: #98989d;
+  }
+  #suggestions-section {
+    background: #1e3a5f;
+  }
+}
