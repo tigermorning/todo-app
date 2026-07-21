@@ -1344,7 +1344,7 @@ categorySelect.addEventListener("change", () => {
   }
 });
 
-let collapsedCategoryGroups = new Set();
+let expandedCategoryGroups = new Set();
 
 function renderManageCategories() {
   manageCategoriesList.innerHTML = "";
@@ -1354,7 +1354,7 @@ function renderManageCategories() {
 
   for (const c of parents) {
     const subs = children.filter((ch) => ch.parent_name === c.name);
-    const isCollapsed = collapsedCategoryGroups.has(c.name);
+    const isExpanded = expandedCategoryGroups.has(c.name);
 
     const li = document.createElement("li");
     li.className = "manage-category-row";
@@ -1363,13 +1363,13 @@ function renderManageCategories() {
     toggleBtn.type = "button";
     toggleBtn.className = "cat-toggle-btn";
     if (subs.length > 0) {
-      toggleBtn.textContent = isCollapsed ? "▸" : "▾";
-      toggleBtn.setAttribute("aria-label", isCollapsed ? "하위 카테고리 펼치기" : "하위 카테고리 접기");
+      toggleBtn.textContent = isExpanded ? "▼" : "▶";
+      toggleBtn.setAttribute("aria-label", isExpanded ? "하위 카테고리 접기" : "하위 카테고리 펼치기");
       toggleBtn.addEventListener("click", () => {
-        if (isCollapsed) {
-          collapsedCategoryGroups.delete(c.name);
+        if (isExpanded) {
+          expandedCategoryGroups.delete(c.name);
         } else {
-          collapsedCategoryGroups.add(c.name);
+          expandedCategoryGroups.add(c.name);
         }
         renderManageCategories();
       });
@@ -1439,7 +1439,7 @@ function renderManageCategories() {
     li.append(toggleBtn, iconInput, nameInput, groupSelect, saveBtn, deleteBtn);
     manageCategoriesList.appendChild(li);
 
-    if (isCollapsed) continue;
+    if (!isExpanded) continue;
 
     for (const sub of subs) {
       const subLi = document.createElement("li");
