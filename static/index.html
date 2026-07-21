@@ -185,21 +185,41 @@
       </div>
     </div>
 
-    <div id="filter-bar">
-      <input type="text" id="search-input" placeholder="검색" autocomplete="off" />
-      <select id="category-filter">
-        <option value="">전체 카테고리</option>
-      </select>
+    <div id="view-toggle">
+      <button type="button" id="view-list-btn" class="view-toggle-btn active">☰ 목록 보기</button>
+      <button type="button" id="view-timeline-btn" class="view-toggle-btn">📅 시간표 보기</button>
     </div>
-    <div id="select-all-row">
-      <button type="button" id="select-all-btn">전체 선택</button>
+
+    <div id="list-view">
+      <div id="filter-bar">
+        <input type="text" id="search-input" placeholder="검색" autocomplete="off" />
+        <select id="category-filter">
+          <option value="">전체 카테고리</option>
+        </select>
+      </div>
+      <div id="select-all-row">
+        <button type="button" id="select-all-btn">전체 선택</button>
+      </div>
+      <div id="bulk-actions" hidden>
+        <span id="bulk-count"></span>
+        <button type="button" id="bulk-delete-btn">선택 삭제</button>
+        <button type="button" id="bulk-clear-btn">선택 해제</button>
+      </div>
+      <ul id="todo-list"></ul>
     </div>
-    <div id="bulk-actions" hidden>
-      <span id="bulk-count"></span>
-      <button type="button" id="bulk-delete-btn">선택 삭제</button>
-      <button type="button" id="bulk-clear-btn">선택 해제</button>
+
+    <div id="timeline-view" hidden>
+      <div id="timeline-nav">
+        <button type="button" id="timeline-prev">◀</button>
+        <span id="timeline-date-label"></span>
+        <button type="button" id="timeline-next">▶</button>
+        <button type="button" id="timeline-today">오늘</button>
+      </div>
+      <ul id="timeline-unscheduled"></ul>
+      <div id="timeline-grid-wrap">
+        <div id="timeline-grid"></div>
+      </div>
     </div>
-    <ul id="todo-list"></ul>
   </main>
   </div>
   <script src="/static/app.js"></script>

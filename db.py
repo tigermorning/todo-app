@@ -47,6 +47,7 @@ CATEGORY_ICONS = {
     "가계부": "📒",
     "예산": "🧮",
     "투자": "📈",
+    "기타": "📌",
 }
 
 DEFAULT_CATEGORIES = [
@@ -57,6 +58,11 @@ DEFAULT_CATEGORIES = [
     ("인간관계", "social", None),
     ("휴식", "rest", None),
     ("재정", "finance", None),
+    # "기타"는 카테고리를 못 알아낸 할 일에 붙는 실제 fallback 문자열(예:
+    # _guess_category, 구글 캘린더 수락)이라 실제 카테고리 행으로도 있어야
+    # 색상/아이콘이 제대로 붙는다 — 없으면 목록 배지·타임라인·비중 차트가
+    # 전부 회색 처리된다.
+    ("기타", "etc", None),
 ]
 # 자식 카테고리 별도 추가
 DEFAULT_SUBCATEGORIES = [

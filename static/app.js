@@ -45,6 +45,20 @@ const calendarLabel = document.getElementById("calendar-label");
 const calendarGrid = document.getElementById("calendar-grid");
 const calendarClear = document.getElementById("calendar-clear");
 
+const viewListBtn = document.getElementById("view-list-btn");
+const viewTimelineBtn = document.getElementById("view-timeline-btn");
+const listView = document.getElementById("list-view");
+const timelineView = document.getElementById("timeline-view");
+const timelinePrev = document.getElementById("timeline-prev");
+const timelineNext = document.getElementById("timeline-next");
+const timelineToday = document.getElementById("timeline-today");
+const timelineDateLabel = document.getElementById("timeline-date-label");
+const timelineUnscheduled = document.getElementById("timeline-unscheduled");
+const timelineGrid = document.getElementById("timeline-grid");
+
+let currentView = "list";
+let timelineDate = new Date();
+
 const trackerSelect = document.getElementById("tracker-select");
 const trackerNewBtn = document.getElementById("tracker-new-btn");
 const trackerDuplicateBtn = document.getElementById("tracker-duplicate-btn");
@@ -432,6 +446,7 @@ async function setTodoCategory(id, category) {
     body: JSON.stringify({ category }),
   });
   await renderBalance();
+  await renderTimeline();
 }
 
 async function toggleTodo(id) {
@@ -439,6 +454,7 @@ async function toggleTodo(id) {
   await fetchTodos();
   await renderTracker();
   await renderBalance();
+  await renderTimeline();
 }
 
 async function bulkSetDone(ids, done) {
@@ -454,6 +470,7 @@ async function bulkSetDone(ids, done) {
   await fetchTodos();
   await renderTracker();
   await renderBalance();
+  await renderTimeline();
 }
 
 async function deleteTodo(id) {
@@ -462,6 +479,7 @@ async function deleteTodo(id) {
   await fetchTodos();
   await renderCalendar();
   await renderBalance();
+  await renderTimeline();
 }
 
 function selectTodo(id, shiftKey) {
@@ -503,6 +521,7 @@ bulkDeleteBtn.addEventListener("click", async () => {
   await fetchTodos();
   await renderCalendar();
   await renderBalance();
+  await renderTimeline();
 });
 
 bulkClearBtn.addEventListener("click", () => {
@@ -699,6 +718,148 @@ calendarClear.addEventListener("click", () => {
   renderCalendar();
   fetchTodos();
 });
+
+const TIMELINE_HOUR_HEIGHT = 48; // px per hour
+const TIMELINE_BLOCK_MINUTES = 30; // fixed visual block length (todos have no duration field)
+const TIMELINE_START_HOUR = 8; // initial scroll position, like Google Calendar's day view
+
+function dateToISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function categoryVisual(categoryName) {
+  const meta = categoriesMap[categoryName];
+  return {
+    color: meta ? meta.color : "#95A5A6",
+    icon: meta ? meta.icon : "🏷️",
+  };
+}
+
+function switchView(view) {
+  currentView = view;
+  const isTimeline = view === "timeline";
+  listView.hidden = isTimeline;
+  timelineView.hidden = !isTimeline;
+  viewListBtn.classList.toggle("active", !isTimeline);
+  viewTimelineBtn.classList.toggle("active", isTimeline);
+  if (isTimeline) renderTimeline();
+}
+
+viewListBtn.addEventListener("click", () => switchView("list"));
+viewTimelineBtn.addEventListener("click", () => switchView("timeline"));
+
+timelinePrev.addEventListener("click", () => {
+  timelineDate = new Date(
+    timelineDate.getFullYear(),
+    timelineDate.getMonth(),
+    timelineDate.getDate() - 1
+  );
+  renderTimeline();
+});
+timelineNext.addEventListener("click", () => {
+  timelineDate = new Date(
+    timelineDate.getFullYear(),
+    timelineDate.getMonth(),
+    timelineDate.getDate() + 1
+  );
+  renderTimeline();
+});
+timelineToday.addEventListener("click", () => {
+  timelineDate = new Date();
+  renderTimeline();
+});
+
+async function renderTimeline() {
+  if (currentView !== "timeline") return;
+
+  const iso = dateToISO(timelineDate);
+  const isToday = iso === todayISO();
+  timelineDateLabel.textContent = `${iso}${isToday ? " (오늘)" : ""}`;
+
+  // date= filters out rows with no due_at entirely, so fetch unfiltered and split client-side
+  // (the "시간 미정" bucket needs every undated todo, not just ones matching this day).
+  const res = await fetch("/api/todos");
+  const todos = await res.json();
+
+  const scheduled = todos.filter((t) => t.due_at && t.due_at.slice(0, 10) === iso);
+  const unscheduled = todos.filter((t) => !t.due_at);
+
+  timelineUnscheduled.innerHTML = "";
+  if (unscheduled.length === 0) {
+    timelineUnscheduled.hidden = true;
+  } else {
+    timelineUnscheduled.hidden = false;
+    const heading = document.createElement("li");
+    heading.className = "timeline-unscheduled-heading";
+    heading.textContent = "시간 미정";
+    timelineUnscheduled.appendChild(heading);
+    for (const todo of unscheduled) {
+      const { color, icon } = categoryVisual(todo.category);
+      const chip = document.createElement("li");
+      chip.className = "timeline-unscheduled-chip" + (todo.done ? " done" : "");
+      chip.style.borderLeftColor = color;
+      chip.textContent = `${icon} ${todo.title}`;
+      chip.addEventListener("click", () => toggleTodo(todo.id));
+      timelineUnscheduled.appendChild(chip);
+    }
+  }
+
+  timelineGrid.innerHTML = "";
+  timelineGrid.style.height = `${24 * TIMELINE_HOUR_HEIGHT}px`;
+
+  for (let hour = 0; hour <= 24; hour++) {
+    const row = document.createElement("div");
+    row.className = "timeline-hour-row";
+    row.style.top = `${hour * TIMELINE_HOUR_HEIGHT}px`;
+    const label = document.createElement("span");
+    label.className = "timeline-hour-label";
+    label.textContent = `${String(hour).padStart(2, "0")}:00`;
+    row.appendChild(label);
+    timelineGrid.appendChild(row);
+  }
+
+  const lane = document.createElement("div");
+  lane.className = "timeline-lane";
+  for (const todo of scheduled) {
+    const [, timePart] = todo.due_at.split(" ");
+    const [hh, mm] = timePart.split(":").map(Number);
+    const minutesFromMidnight = hh * 60 + mm;
+    const top = (minutesFromMidnight / 60) * TIMELINE_HOUR_HEIGHT;
+    const height = (TIMELINE_BLOCK_MINUTES / 60) * TIMELINE_HOUR_HEIGHT;
+
+    const { color, icon } = categoryVisual(todo.category);
+    const block = document.createElement("div");
+    block.className = "timeline-block" + (todo.done ? " done" : "");
+    block.style.top = `${top}px`;
+    block.style.height = `${height}px`;
+    block.style.borderLeftColor = color;
+    block.style.background = `${color}26`;
+    block.title = `${timePart} ${todo.title}`;
+
+    const timeLabel = document.createElement("span");
+    timeLabel.className = "timeline-block-time";
+    timeLabel.textContent = timePart;
+
+    const titleLabel = document.createElement("span");
+    titleLabel.className = "timeline-block-title";
+    titleLabel.textContent = `${icon} ${todo.title}`;
+
+    block.append(timeLabel, titleLabel);
+    block.addEventListener("click", () => toggleTodo(todo.id));
+    lane.appendChild(block);
+  }
+  timelineGrid.appendChild(lane);
+
+  if (isToday) {
+    const now = new Date();
+    const nowLine = document.createElement("div");
+    nowLine.className = "timeline-now-line";
+    nowLine.style.top = `${((now.getHours() * 60 + now.getMinutes()) / 60) * TIMELINE_HOUR_HEIGHT}px`;
+    timelineGrid.appendChild(nowLine);
+  }
+
+  timelineGrid.parentElement.scrollTop = TIMELINE_START_HOUR * TIMELINE_HOUR_HEIGHT;
+}
 
 async function loadTrackers() {
   const res = await fetch("/api/trackers");
@@ -1720,6 +1881,7 @@ categoryFilter.addEventListener("change", () => fetchTodos());
   await renderCalendar();
   await renderTracker();
   await renderBalance();
+  await renderTimeline();
   await checkOverdue();
   setInterval(checkOverdue, 60000);
 })();
