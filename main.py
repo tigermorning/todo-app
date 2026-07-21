@@ -403,6 +403,97 @@ def list_groups():
     return GROUPS
 
 
+VALID_BALANCE_PERIODS = {"day", "week", "month", "quarter", "half", "year"}
+
+
+def _add_months(d: date, months: int) -> date:
+    total = (d.month - 1) + months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    return date(year, month, 1)
+
+
+def _period_range(period: str, ref: date) -> tuple[date, date]:
+    if period == "day":
+        start = ref
+        return start, start + timedelta(days=1)
+    if period == "week":
+        start = ref - timedelta(days=ref.weekday())
+        return start, start + timedelta(days=7)
+    if period == "month":
+        start = ref.replace(day=1)
+        return start, _add_months(start, 1)
+    if period == "quarter":
+        quarter_start_month = (ref.month - 1) // 3 * 3 + 1
+        start = ref.replace(month=quarter_start_month, day=1)
+        return start, _add_months(start, 3)
+    if period == "half":
+        half_start_month = 1 if ref.month <= 6 else 7
+        start = ref.replace(month=half_start_month, day=1)
+        return start, _add_months(start, 6)
+    if period == "year":
+        start = ref.replace(month=1, day=1)
+        return start, start.replace(year=start.year + 1)
+    raise HTTPException(status_code=400, detail="period은 day/week/month/quarter/half/year 중 하나여야 합니다.")
+
+
+@app.get("/api/categories/breakdown")
+def category_breakdown(period: str = Query("week"), date_str: Optional[str] = Query(None, alias="date")):
+    if period not in VALID_BALANCE_PERIODS:
+        raise HTTPException(status_code=400, detail="period은 day/week/month/quarter/half/year 중 하나여야 합니다.")
+
+    ref = date.fromisoformat(date_str) if date_str else date.today()
+    start, end = _period_range(period, ref)
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT category, COUNT(*) AS cnt
+            FROM todos
+            WHERE done = 1
+              AND completed_at IS NOT NULL
+              AND date(completed_at) >= date(?)
+              AND date(completed_at) < date(?)
+            GROUP BY category
+            """,
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        cat_rows = conn.execute("SELECT name, group_key FROM categories").fetchall()
+
+    category_to_group = {row["name"]: row["group_key"] for row in cat_rows}
+
+    totals = {g["key"]: 0 for g in GROUPS}
+    total = 0
+    for row in rows:
+        group_key = category_to_group.get(row["category"], "etc")
+        if group_key not in totals:
+            group_key = "etc"
+        totals[group_key] += row["cnt"]
+        total += row["cnt"]
+
+    groups_result = []
+    for g in GROUPS:
+        count = totals[g["key"]]
+        percentage = round(count / total * 100, 1) if total else 0.0
+        groups_result.append(
+            {
+                "key": g["key"],
+                "label": g["label"],
+                "color": g["color"],
+                "icon": g["icon"],
+                "count": count,
+                "percentage": percentage,
+            }
+        )
+
+    return {
+        "period": period,
+        "range": {"start": start.isoformat(), "end": (end - timedelta(days=1)).isoformat()},
+        "total": total,
+        "groups": groups_result,
+    }
+
+
 @app.get("/api/categories")
 def list_categories():
     with get_connection() as conn:

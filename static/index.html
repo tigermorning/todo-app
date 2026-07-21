@@ -60,6 +60,26 @@
       <div id="tracker-grid" class="grid-calendar"></div>
       <p id="tracker-empty" hidden>아직 Tracker가 없습니다. ＋ 버튼으로 만들어보세요.</p>
     </div>
+    <div id="balance">
+      <div id="balance-toolbar">
+        <span id="balance-title">삶의 균형</span>
+        <select id="balance-period">
+          <option value="day">일별</option>
+          <option value="week" selected>주별</option>
+          <option value="month">월별</option>
+          <option value="quarter">분기별</option>
+          <option value="half">반기별</option>
+          <option value="year">연별</option>
+        </select>
+      </div>
+      <div id="balance-range"></div>
+      <div id="balance-chart-wrap">
+        <svg id="balance-chart" viewBox="0 0 100 100"></svg>
+        <div id="balance-total"></div>
+      </div>
+      <ul id="balance-legend"></ul>
+      <p id="balance-empty" hidden>완료한 할 일이 아직 없어요.</p>
+    </div>
   </aside>
   <main>
     <h1>내 할 일</h1>

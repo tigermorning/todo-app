@@ -69,6 +69,13 @@ let trackers = [];
 let currentTrackerId = null;
 
 
+const balancePeriodSelect = document.getElementById("balance-period");
+const balanceRangeEl = document.getElementById("balance-range");
+const balanceChart = document.getElementById("balance-chart");
+const balanceTotalEl = document.getElementById("balance-total");
+const balanceLegend = document.getElementById("balance-legend");
+const balanceEmpty = document.getElementById("balance-empty");
+
 const overdueSection = document.getElementById("overdue-section");
 const overdueList = document.getElementById("overdue-list");
 const enableNotificationsBtn = document.getElementById("enable-notifications");
@@ -423,12 +430,14 @@ async function setTodoCategory(id, category) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ category }),
   });
+  await renderBalance();
 }
 
 async function toggleTodo(id) {
   await fetch(`/api/todos/${id}/toggle`, { method: "PATCH" });
   await fetchTodos();
   await renderTracker();
+  await renderBalance();
 }
 
 async function bulkSetDone(ids, done) {
@@ -443,6 +452,7 @@ async function bulkSetDone(ids, done) {
   );
   await fetchTodos();
   await renderTracker();
+  await renderBalance();
 }
 
 async function deleteTodo(id) {
@@ -450,6 +460,7 @@ async function deleteTodo(id) {
   selectedTodoIds.delete(id);
   await fetchTodos();
   await renderCalendar();
+  await renderBalance();
 }
 
 function selectTodo(id, shiftKey) {
@@ -490,6 +501,7 @@ bulkDeleteBtn.addEventListener("click", async () => {
   updateBulkActionsBar();
   await fetchTodos();
   await renderCalendar();
+  await renderBalance();
 });
 
 bulkClearBtn.addEventListener("click", () => {
@@ -900,6 +912,107 @@ trackerDuplicateSave.addEventListener("click", async () => {
   await renderTracker();
 });
 
+function describeBalanceRange(period, range) {
+  if (period === "day") return range.start;
+  if (period === "year") return `${range.start.slice(0, 4)}년`;
+  return `${range.start} ~ ${range.end}`;
+}
+
+function renderBalanceChart(groups, total) {
+  const NS = "http://www.w3.org/2000/svg";
+  balanceChart.innerHTML = "";
+
+  if (!total) {
+    balanceChart.hidden = true;
+    balanceTotalEl.textContent = "";
+    return;
+  }
+  balanceChart.hidden = false;
+
+  const cx = 50;
+  const cy = 50;
+  const r = 40;
+  let angle = -Math.PI / 2;
+
+  const nonZero = groups.filter((g) => g.count > 0);
+  if (nonZero.length === 1) {
+    const circle = document.createElementNS(NS, "circle");
+    circle.setAttribute("cx", cx);
+    circle.setAttribute("cy", cy);
+    circle.setAttribute("r", r);
+    circle.setAttribute("fill", nonZero[0].color);
+    balanceChart.appendChild(circle);
+  } else {
+    for (const g of nonZero) {
+      const slice = (g.count / total) * Math.PI * 2;
+      const nextAngle = angle + slice;
+      const x1 = cx + r * Math.cos(angle);
+      const y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(nextAngle);
+      const y2 = cy + r * Math.sin(nextAngle);
+      const largeArc = slice > Math.PI ? 1 : 0;
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute(
+        "d",
+        `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`
+      );
+      path.setAttribute("fill", g.color);
+      const title = document.createElementNS(NS, "title");
+      title.textContent = `${g.icon} ${g.label} ${g.percentage}%`;
+      path.appendChild(title);
+      balanceChart.appendChild(path);
+      angle = nextAngle;
+    }
+  }
+
+  const hole = document.createElementNS(NS, "circle");
+  hole.setAttribute("cx", cx);
+  hole.setAttribute("cy", cy);
+  hole.setAttribute("r", r * 0.55);
+  hole.setAttribute("class", "balance-chart-hole");
+  balanceChart.appendChild(hole);
+
+  balanceTotalEl.textContent = `${total}개`;
+}
+
+function renderBalanceLegend(groups) {
+  balanceLegend.innerHTML = "";
+  for (const g of groups) {
+    if (g.count === 0) continue;
+    const li = document.createElement("li");
+    li.className = "balance-legend-row";
+
+    const swatch = document.createElement("span");
+    swatch.className = "balance-legend-swatch";
+    swatch.style.backgroundColor = g.color;
+
+    const label = document.createElement("span");
+    label.className = "balance-legend-label";
+    label.textContent = `${g.icon} ${g.label}`;
+
+    const value = document.createElement("span");
+    value.className = "balance-legend-value";
+    value.textContent = `${g.count}개 (${g.percentage}%)`;
+
+    li.append(swatch, label, value);
+    balanceLegend.appendChild(li);
+  }
+}
+
+async function renderBalance() {
+  const period = balancePeriodSelect.value;
+  const res = await fetch(`/api/categories/breakdown?period=${period}`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  balanceRangeEl.textContent = describeBalanceRange(data.period, data.range);
+  balanceEmpty.hidden = data.total > 0;
+  renderBalanceChart(data.groups, data.total);
+  renderBalanceLegend(data.groups);
+}
+
+balancePeriodSelect.addEventListener("change", () => renderBalance());
+
 const notifiedIds = new Set();
 
 function loadSnoozes() {
@@ -1231,6 +1344,8 @@ categorySelect.addEventListener("change", () => {
   }
 });
 
+let collapsedCategoryGroups = new Set();
+
 function renderManageCategories() {
   manageCategoriesList.innerHTML = "";
 
@@ -1238,8 +1353,29 @@ function renderManageCategories() {
   const children = Object.values(categoriesMap).filter((c) => c.parent_id);
 
   for (const c of parents) {
+    const subs = children.filter((ch) => ch.parent_name === c.name);
+    const isCollapsed = collapsedCategoryGroups.has(c.name);
+
     const li = document.createElement("li");
     li.className = "manage-category-row";
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "cat-toggle-btn";
+    if (subs.length > 0) {
+      toggleBtn.textContent = isCollapsed ? "▸" : "▾";
+      toggleBtn.setAttribute("aria-label", isCollapsed ? "하위 카테고리 펼치기" : "하위 카테고리 접기");
+      toggleBtn.addEventListener("click", () => {
+        if (isCollapsed) {
+          collapsedCategoryGroups.delete(c.name);
+        } else {
+          collapsedCategoryGroups.add(c.name);
+        }
+        renderManageCategories();
+      });
+    } else {
+      toggleBtn.disabled = true;
+    }
 
     const iconInput = document.createElement("input");
     iconInput.type = "text";
@@ -1300,10 +1436,11 @@ function renderManageCategories() {
       renderManageCategories();
     });
 
-    li.append(iconInput, nameInput, groupSelect, saveBtn, deleteBtn);
+    li.append(toggleBtn, iconInput, nameInput, groupSelect, saveBtn, deleteBtn);
     manageCategoriesList.appendChild(li);
 
-    const subs = children.filter((ch) => ch.parent_name === c.name);
+    if (isCollapsed) continue;
+
     for (const sub of subs) {
       const subLi = document.createElement("li");
       subLi.className = "manage-category-row";
@@ -1426,6 +1563,7 @@ categoryFilter.addEventListener("change", () => fetchTodos());
   await fetchSuggestions();
   await renderCalendar();
   await renderTracker();
+  await renderBalance();
   await checkOverdue();
   setInterval(checkOverdue, 60000);
 })();

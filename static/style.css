@@ -38,7 +38,8 @@ main {
 }
 
 #mini-calendar,
-#tracker {
+#tracker,
+#balance {
   background: #fff;
   border-radius: 12px;
   padding: 1rem;
@@ -291,6 +292,96 @@ main {
   font-size: 0.78rem;
   color: #86868b;
   margin: 0;
+}
+
+#balance-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+#balance-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+#balance-period {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: #fff;
+}
+
+#balance-range {
+  font-size: 0.7rem;
+  color: #86868b;
+  margin-bottom: 0.6rem;
+}
+
+#balance-chart-wrap {
+  position: relative;
+  width: 100px;
+  margin: 0 auto 0.75rem;
+}
+
+#balance-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.balance-chart-hole {
+  fill: #fff;
+}
+
+#balance-total {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+#balance-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.balance-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.balance-legend-swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.balance-legend-label {
+  flex: 1;
+}
+
+.balance-legend-value {
+  color: #86868b;
+}
+
+#balance-empty {
+  font-size: 0.78rem;
+  color: #86868b;
+  margin: 0;
+  text-align: center;
 }
 
 h1 {
@@ -695,6 +786,20 @@ h1 {
   color: #ff3b30;
 }
 
+.manage-category-row .cat-toggle-btn {
+  flex: none;
+  width: 1.6rem;
+  padding: 0.3rem 0;
+  background: none;
+  color: #6e6e73;
+  text-align: center;
+}
+
+.manage-category-row .cat-toggle-btn:disabled {
+  visibility: hidden;
+  cursor: default;
+}
+
 #manage-categories-close {
   padding: 0.35rem 0.7rem;
   border: none;
@@ -982,7 +1087,8 @@ h1 {
   }
   main,
   #mini-calendar,
-  #tracker {
+  #tracker,
+  #balance {
     background: #2c2c2e;
     box-shadow: none;
   }
@@ -991,8 +1097,22 @@ h1 {
   }
   .grid-weekdays,
   #tracker-header,
-  #tracker-empty {
+  #tracker-empty,
+  #balance-range,
+  #balance-empty,
+  .balance-legend-value {
     color: #98989d;
+  }
+  #balance-period {
+    background: #3a3a3c;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  .balance-chart-hole {
+    fill: #2c2c2e;
+  }
+  #balance-total {
+    color: #f5f5f7;
   }
   #calendar-clear {
     background: #48484a;
@@ -1077,6 +1197,9 @@ h1 {
     background: #2c2c2e;
     border-color: #48484a;
     color: #f5f5f7;
+  }
+  .manage-category-row .cat-toggle-btn {
+    color: #98989d;
   }
   #detailed-section {
     border-color: #3a3a3c;

@@ -6,16 +6,48 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "todo.db"
 
 GROUPS = [
-    {"key": "health", "label": "건강", "color": "#4CAF50"},
-    {"key": "selfdev", "label": "자기계발", "color": "#9C27B0"},
-    {"key": "work", "label": "일", "color": "#F5A623"},
-    {"key": "daily", "label": "일상관리", "color": "#607D8B"},
-    {"key": "social", "label": "인간관계", "color": "#FF6B6B"},
-    {"key": "rest", "label": "휴식", "color": "#00BCD4"},
-    {"key": "finance", "label": "재정", "color": "#E91E63"},
-    {"key": "etc", "label": "기타", "color": "#9E9E9E"},
+    {"key": "health", "label": "건강", "color": "#4CAF50", "icon": "🏃"},
+    {"key": "selfdev", "label": "자기계발", "color": "#9C27B0", "icon": "📚"},
+    {"key": "work", "label": "일", "color": "#F5A623", "icon": "💼"},
+    {"key": "daily", "label": "일상관리", "color": "#607D8B", "icon": "🏠"},
+    {"key": "social", "label": "인간관계", "color": "#FF6B6B", "icon": "👥"},
+    {"key": "rest", "label": "휴식", "color": "#00BCD4", "icon": "🌿"},
+    {"key": "finance", "label": "재정", "color": "#E91E63", "icon": "💰"},
+    {"key": "etc", "label": "기타", "color": "#9E9E9E", "icon": "📌"},
 ]
 GROUP_KEYS = {g["key"] for g in GROUPS}
+
+# 카테고리 이름 -> 기본 아이콘. 새로 만드는 카테고리와, 이미 아이콘 없이
+# 만들어진 기존 카테고리를 채워 넣는(backfill) 데 둘 다 쓰인다.
+CATEGORY_ICONS = {
+    "건강": "🏃",
+    "자기계발": "📚",
+    "일": "💼",
+    "일상관리": "🏠",
+    "인간관계": "👥",
+    "휴식": "🌿",
+    "재정": "💰",
+    "운동": "💪",
+    "약물관리": "💊",
+    "식단": "🥗",
+    "공부": "📖",
+    "독서": "📕",
+    "강의": "🎓",
+    "청소": "🧹",
+    "빨래": "🧺",
+    "장보기": "🛒",
+    "공과금": "💡",
+    "행정업무": "📋",
+    "데이트": "💕",
+    "약속": "🤝",
+    "가족": "👨‍👩‍👧",
+    "취미": "🎨",
+    "명상": "🧘",
+    "산책": "🚶",
+    "가계부": "📒",
+    "예산": "🧮",
+    "투자": "📈",
+}
 
 DEFAULT_CATEGORIES = [
     ("건강", "health", None),
@@ -132,15 +164,24 @@ def init_db():
                 ).fetchone()
                 if parent_row:
                     parent_id = parent_row["id"]
+            icon = CATEGORY_ICONS.get(name, "")
             conn.execute(
-                "INSERT OR IGNORE INTO categories (name, icon, group_key, parent_id) VALUES (?, '', ?, ?)",
-                (name, group_key, parent_id),
+                "INSERT OR IGNORE INTO categories (name, icon, group_key, parent_id) VALUES (?, ?, ?, ?)",
+                (name, icon, group_key, parent_id),
             )
 
         for name, gkey, _ in DEFAULT_CATEGORIES:
             insert_cat(name, gkey)
         for name, parent_name, gkey in DEFAULT_SUBCATEGORIES:
             insert_cat(name, gkey, parent_name)
+
+        # 기본 카테고리가 아이콘 없이(버그로 빈 문자열로) 이미 만들어져 있던
+        # 기존 DB를 위한 보정 — 이름이 일치하는 경우에만 채워 넣는다.
+        for name, icon in CATEGORY_ICONS.items():
+            conn.execute(
+                "UPDATE categories SET icon = ? WHERE name = ? AND (icon IS NULL OR icon = '')",
+                (icon, name),
+            )
 
         conn.execute(
             """
