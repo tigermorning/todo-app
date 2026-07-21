@@ -8,7 +8,7 @@ const {
 } = require("@modelcontextprotocol/sdk/types.js");
 const fetch = require("node-fetch");
 
-const API_BASE = process.env.TODO_API_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.TODO_API_URL || "http://127.0.0.1:8090";
 
 const server = new Server(
   { name: "todo-mcp", version: "2.0.0" },

@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
             extend_all_rules(conn)
         print("=" * 50)
         print("  서버가 성공적으로 시작되었습니다.")
-        print("  URL: http://127.0.0.1:8000")
+        print("  (실제 접속 주소는 아래 Uvicorn 로그의 URL을 확인하세요)")
         print("  종료하려면 Ctrl+C를 누르세요")
         print("=" * 50)
     except Exception as e:

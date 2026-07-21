@@ -5,7 +5,7 @@ from datetime import datetime
 import fire
 import requests
 
-API_BASE = os.environ.get("TODO_API_URL", "http://127.0.0.1:8000")
+API_BASE = os.environ.get("TODO_API_URL", "http://127.0.0.1:8090")
 
 
 def _api(method, path, **kwargs):
@@ -40,7 +40,13 @@ def _format_done(done):
     return "[v]" if done else "[ ]"
 
 
-class TodoCLI:
+def _combine_due_at(date=None, time=None):
+    if not date:
+        return None
+    return f"{date} {time or '00:00'}"
+
+
+class TaskCommands:
     def list(self, category=None, date=None, search=None):
         """할 일 목록을 조회합니다."""
         params = {}
@@ -63,9 +69,10 @@ class TodoCLI:
             cat = t.get("category", "")[:8]
             print(f"{t['id']:<4} {done:<5} {title:<40} {due:<20} {cat:<10}")
 
-    def add(self, title, due_at=None, category=""):
-        """새 할 일을 추가합니다."""
+    def add(self, title, date=None, time=None, category=""):
+        """새 할 일을 추가합니다 (--date YYYY-MM-DD --time HH:MM)."""
         data = {"title": title, "category": category}
+        due_at = _combine_due_at(date, time)
         if due_at:
             data["due_at"] = due_at
         result = _api("POST", "/api/todos", json=data)
@@ -88,30 +95,36 @@ class TodoCLI:
         else:
             print(f"추가됨 (id={result['id']}): {result['title']}")
 
-    def done(self, todo_id):
+    def done(self, task_id):
         """할 일을 완료 처리합니다 (토글)."""
-        result = _api("PATCH", f"/api/todos/{todo_id}/toggle")
+        result = _api("PATCH", f"/api/todos/{task_id}/toggle")
         status = "완료" if result["done"] else "취소"
-        print(f"id={todo_id} {status}")
+        print(f"id={task_id} {status}")
 
-    def toggle(self, todo_id):
+    def toggle(self, task_id):
         """할 일 완료 상태를 토글합니다."""
-        return self.done(todo_id)
+        return self.done(task_id)
 
-    def update(self, todo_id, title=None, due_at=None):
-        """할 일을 수정합니다."""
+    def update(self, task_id, title=None, date=None, time=None):
+        """할 일을 수정합니다 (--date/--time으로 마감 변경)."""
         data = {}
         if title:
             data["title"] = title
-        if due_at is not None:
+        due_at = _combine_due_at(date, time)
+        if due_at:
             data["due_at"] = due_at
-        _api("PATCH", f"/api/todos/{todo_id}", json=data)
-        print(f"id={todo_id} 수정됨")
+        _api("PATCH", f"/api/todos/{task_id}", json=data)
+        print(f"id={task_id} 수정됨")
 
-    def delete(self, todo_id):
+    def delete(self, task_id):
         """할 일을 삭제합니다."""
-        _api("DELETE", f"/api/todos/{todo_id}")
-        print(f"id={todo_id} 삭제됨")
+        _api("DELETE", f"/api/todos/{task_id}")
+        print(f"id={task_id} 삭제됨")
+
+
+class TodoCLI:
+    def __init__(self):
+        self.task = TaskCommands()
 
     def categories(self):
         """카테고리 목록을 조회합니다."""
@@ -128,6 +141,29 @@ class TodoCLI:
             return
         for r in rules:
             print(f"#{r['id']} {r['title']}  ({r['freq']} / {r.get('category', '')})")
+
+    def balance(self, period="week", today=False, date=None):
+        """완료한 할 일을 카테고리 그룹별 비중으로 보여줍니다.
+
+        --today는 period=day의 단축 표현입니다. period는 day/week/month/quarter/half/year.
+        """
+        if today:
+            period = "day"
+        params = {"period": period}
+        if date:
+            params["date"] = date
+        result = _api("GET", "/api/categories/breakdown", params=params)
+
+        r = result["range"]
+        print(f"[{result['period']}] {r['start']} ~ {r['end']}  (총 {result['total']}건)")
+        if result["total"] == 0:
+            print("완료한 할 일이 아직 없어요.")
+            return
+        print("-" * 40)
+        for g in result["groups"]:
+            if g["count"] == 0:
+                continue
+            print(f"{g['icon']} {g['label']:<10} {g['count']:>3}건  ({g['percentage']:>5.1f}%)")
 
 
 def main():

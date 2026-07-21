@@ -60,10 +60,10 @@ Then run it:
 - **Windows**: double-click **`start.bat`** (or run it from cmd/PowerShell) — it activates the virtual environment and starts uvicorn with the paths below filled in automatically.
 - **macOS / Linux**:
   ```bash
-  uvicorn main:app --reload --reload-exclude="$(pwd)/venv" --reload-exclude="$(pwd)/__pycache__"
+  uvicorn main:app --reload --reload-exclude="$(pwd)/venv" --reload-exclude="$(pwd)/__pycache__" --port 8090
   ```
 
-Open **http://localhost:8000** in your browser. That's it — the SQLite database and all category presets are created automatically on first run.
+Open **http://localhost:8090** in your browser. That's it — the SQLite database and all category presets are created automatically on first run.
 
 > **Why `--reload-exclude` needs an absolute path:** without it, `--reload` watches every file inside `venv/` too — including the entire installed dependency tree (fastapi, google API client libs, etc., thousands of files), any of which can have its mtime touched by pip, an antivirus scan, or backup/sync software and trigger a reload storm that looks like the server "randomly crashing". A glob like `--reload-exclude=venv/*` or a bare relative name like `--reload-exclude=venv` only shadows files *directly* inside `venv/` — nested files several levels down (e.g. `venv/Lib/site-packages/fastapi/applications.py`) still get watched, since uvicorn compares excluded directories against the *absolute* paths it watches, and a relative `venv` never equals an absolute one. Passing the full absolute path (as `start.bat` and the command above do) is what actually makes the exclusion recursive.
 
