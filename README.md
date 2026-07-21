@@ -1,5 +1,7 @@
 # Todo App
 
+> **Note:** The app's UI (buttons, labels, messages) is entirely in Korean, and quick-entry parsing only understands Korean sentences. This README is written in English for a wider GitHub audience — the app itself has not been translated.
+
 A personal, local-first Todo app built with Python (FastAPI) and SQLite. It runs entirely on your own computer — there's no hosted backend, no account system, and no server costs, even if you make the code public. Each person who runs it keeps their own local database file.
 
 The standout feature is **Korean natural-language quick entry**: type a sentence like `내일 오후 1시에 네일숍` ("nail salon tomorrow at 1pm") and the app extracts the title and due date/time automatically, including compact recurring schedules like `8/3-11/5 격주 공원 산책` ("park walk, biweekly, Aug 3 to Nov 5").
