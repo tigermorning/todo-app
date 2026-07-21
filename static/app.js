@@ -51,6 +51,9 @@ const trackerDuplicateBtn = document.getElementById("tracker-duplicate-btn");
 const trackerNewForm = document.getElementById("tracker-new-form");
 const trackerNewName = document.getElementById("tracker-new-name");
 const trackerNewLink = document.getElementById("tracker-new-link");
+const trackerNewWeeklyToggle = document.getElementById("tracker-new-weekly-toggle");
+const trackerNewWeeklyTargetRow = document.getElementById("tracker-new-weekly-target-row");
+const trackerNewWeeklyTarget = document.getElementById("tracker-new-weekly-target");
 const trackerNewSave = document.getElementById("tracker-new-save");
 const trackerNewCancel = document.getElementById("tracker-new-cancel");
 const trackerDuplicateForm = document.getElementById("tracker-duplicate-form");
@@ -553,7 +556,11 @@ async function loadTrackers() {
   for (const t of trackers) {
     const opt = document.createElement("option");
     opt.value = t.id;
-    opt.textContent = t.recurring_rule_id ? `🔗 ${t.name}` : t.name;
+    opt.textContent = t.recurring_rule_id
+      ? `🔗 ${t.name}`
+      : t.weekly_target
+      ? `🎯 ${t.name} (주 ${t.weekly_target}회)`
+      : t.name;
     trackerSelect.appendChild(opt);
   }
 
@@ -571,6 +578,7 @@ async function renderTracker() {
   const hasTracker = currentTrackerId != null;
   const current = trackers.find((t) => t.id === currentTrackerId);
   const isLinked = !!(current && current.recurring_rule_id);
+  const weeklyTarget = current ? current.weekly_target : null;
 
   trackerSelect.hidden = !hasTracker;
   trackerDuplicateBtn.hidden = !hasTracker || isLinked;
@@ -590,17 +598,23 @@ async function renderTracker() {
   trackerHeaderEl.textContent =
     isLinked && current.recurring_title
       ? `${data.year}년 ${data.month}월 · 🔗 ${current.recurring_title}`
+      : weeklyTarget
+      ? `${data.year}년 ${data.month}월 · 🎯 주 ${weeklyTarget}회`
       : `${data.year}년 ${data.month}월`;
 
   trackerGrid.innerHTML = "";
   if (days.length === 0) return;
 
+  // 패딩 칸과 실제 날짜 칸을 순서대로 한 배열에 모아서, 7개씩 끊으면 달력
+  // 그리드의 한 행(=한 주)과 정확히 일치한다 - 주간 목표 달성 여부를
+  // 판정/배경 강조하려면 이 주 단위 묶음이 필요하다.
+  const cells = [];
   const firstDate = new Date(`${days[0].date}T00:00:00`);
   const padding = firstDate.getDay();
   for (let i = 0; i < padding; i++) {
     const empty = document.createElement("span");
     empty.className = "calendar-day empty";
-    trackerGrid.appendChild(empty);
+    cells.push({ el: empty, isDone: false, isDay: false });
   }
   for (const d of days) {
     const btn = document.createElement("button");
@@ -608,31 +622,48 @@ async function renderTracker() {
     btn.className = "calendar-day";
     if (isLinked) btn.classList.add("tracker-linked");
     btn.dataset.status = d.status || "";
-    if (d.status === "done") btn.classList.add("tracker-done");
-    else if (d.status === "failed") btn.classList.add("tracker-failed");
+    if (weeklyTarget) {
+      if (d.status === "done") btn.classList.add("tracker-weekly-mark");
+    } else if (d.status === "done") {
+      btn.classList.add("tracker-done");
+    } else if (d.status === "failed") {
+      btn.classList.add("tracker-failed");
+    }
     btn.textContent = d.day;
     btn.title = d.date;
     if (!isLinked) {
-      btn.addEventListener("click", () => cycleTrackerEntry(d.date, btn));
+      btn.addEventListener("click", () => cycleTrackerEntry(d.date, btn, !!weeklyTarget));
     }
-    trackerGrid.appendChild(btn);
+    cells.push({ el: btn, isDone: d.status === "done", isDay: true });
   }
+
+  if (weeklyTarget) {
+    for (let i = 0; i < cells.length; i += 7) {
+      const week = cells.slice(i, i + 7);
+      const doneCount = week.filter((c) => c.isDay && c.isDone).length;
+      if (doneCount >= weeklyTarget) {
+        for (const c of week) c.el.classList.add("tracker-week-goal-met");
+      }
+    }
+  }
+
+  for (const c of cells) trackerGrid.appendChild(c.el);
 }
 
-async function cycleTrackerEntry(dateStr, btn) {
+async function cycleTrackerEntry(dateStr, btn, isWeekly) {
   const current = btn.dataset.status || null;
-  const next = current === "done" ? "failed" : current === "failed" ? null : "done";
-
-  btn.classList.remove("tracker-done", "tracker-failed");
-  if (next === "done") btn.classList.add("tracker-done");
-  else if (next === "failed") btn.classList.add("tracker-failed");
-  btn.dataset.status = next || "";
+  const next = isWeekly
+    ? current === "done" ? null : "done"
+    : current === "done" ? "failed" : current === "failed" ? null : "done";
 
   await fetch(`/api/trackers/${currentTrackerId}/entries/${dateStr}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: next }),
   });
+  // 주간 목표는 이 날짜 하나만 바뀌어도 같은 주 전체의 배경 강조가 바뀔 수
+  // 있어(달성/미달성 전환), 이 버튼만 patch하지 않고 전체를 다시 그린다.
+  await renderTracker();
 }
 
 trackerSelect.addEventListener("change", () => {
@@ -659,6 +690,10 @@ trackerNewBtn.addEventListener("click", async () => {
   trackerNewForm.hidden = false;
   trackerNewName.value = "";
   trackerNewLink.value = "";
+  trackerNewLink.disabled = false;
+  trackerNewWeeklyToggle.checked = false;
+  trackerNewWeeklyTargetRow.hidden = true;
+  trackerNewWeeklyTarget.value = "2";
   await populateTrackerLinkOptions();
   trackerNewName.focus();
 });
@@ -667,11 +702,26 @@ trackerNewCancel.addEventListener("click", () => {
   trackerNewForm.hidden = true;
 });
 
+trackerNewWeeklyToggle.addEventListener("change", () => {
+  trackerNewWeeklyTargetRow.hidden = !trackerNewWeeklyToggle.checked;
+  trackerNewLink.disabled = trackerNewWeeklyToggle.checked;
+  if (trackerNewWeeklyToggle.checked) trackerNewLink.value = "";
+});
+
 trackerNewSave.addEventListener("click", async () => {
   const name = trackerNewName.value.trim();
   if (!name) return;
   const body = { name };
-  if (trackerNewLink.value) body.recurring_rule_id = Number(trackerNewLink.value);
+  if (trackerNewWeeklyToggle.checked) {
+    const target = Number(trackerNewWeeklyTarget.value);
+    if (!Number.isInteger(target) || target < 1 || target > 7) {
+      alert("주간 목표는 1~7 사이의 숫자여야 합니다.");
+      return;
+    }
+    body.weekly_target = target;
+  } else if (trackerNewLink.value) {
+    body.recurring_rule_id = Number(trackerNewLink.value);
+  }
   const res = await fetch("/api/trackers", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

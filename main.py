@@ -138,6 +138,7 @@ class RecurringRuleCreate(BaseModel):
 class TrackerCreate(BaseModel):
     name: str
     recurring_rule_id: Optional[int] = None
+    weekly_target: Optional[int] = None
 
 
 class TrackerDuplicate(BaseModel):
@@ -185,7 +186,7 @@ def list_trackers():
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT t.id, t.name, t.created_at, t.recurring_rule_id, r.title AS recurring_title
+            SELECT t.id, t.name, t.created_at, t.recurring_rule_id, t.weekly_target, r.title AS recurring_title
             FROM trackers t
             LEFT JOIN recurring_rules r ON r.id = t.recurring_rule_id
             ORDER BY t.id
@@ -199,6 +200,12 @@ def create_tracker(tracker: TrackerCreate):
     name = tracker.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="이름은 비어 있을 수 없습니다.")
+    if tracker.recurring_rule_id is not None and tracker.weekly_target is not None:
+        raise HTTPException(
+            status_code=400, detail="반복 일정 연동과 주간 목표는 동시에 설정할 수 없습니다."
+        )
+    if tracker.weekly_target is not None and not (1 <= tracker.weekly_target <= 7):
+        raise HTTPException(status_code=400, detail="주간 목표는 1~7 사이여야 합니다.")
     with get_connection() as conn:
         if tracker.recurring_rule_id is not None:
             rule = conn.execute(
@@ -207,11 +214,16 @@ def create_tracker(tracker: TrackerCreate):
             if rule is None:
                 raise HTTPException(status_code=404, detail="해당 반복 일정을 찾을 수 없습니다.")
         cursor = conn.execute(
-            "INSERT INTO trackers (name, recurring_rule_id) VALUES (?, ?)",
-            (name, tracker.recurring_rule_id),
+            "INSERT INTO trackers (name, recurring_rule_id, weekly_target) VALUES (?, ?, ?)",
+            (name, tracker.recurring_rule_id, tracker.weekly_target),
         )
         new_id = cursor.lastrowid
-    return {"id": new_id, "name": name, "recurring_rule_id": tracker.recurring_rule_id}
+    return {
+        "id": new_id,
+        "name": name,
+        "recurring_rule_id": tracker.recurring_rule_id,
+        "weekly_target": tracker.weekly_target,
+    }
 
 
 @app.post("/api/trackers/{tracker_id}/duplicate")
@@ -221,7 +233,7 @@ def duplicate_tracker(tracker_id: int, dup: TrackerDuplicate):
         raise HTTPException(status_code=400, detail="이름은 비어 있을 수 없습니다.")
     with get_connection() as conn:
         existing = conn.execute(
-            "SELECT id, recurring_rule_id FROM trackers WHERE id = ?", (tracker_id,)
+            "SELECT id, recurring_rule_id, weekly_target FROM trackers WHERE id = ?", (tracker_id,)
         ).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="해당 Tracker를 찾을 수 없습니다.")
@@ -230,7 +242,10 @@ def duplicate_tracker(tracker_id: int, dup: TrackerDuplicate):
                 status_code=400,
                 detail="반복 일정과 연동된 Tracker는 복제할 수 없습니다. 다른 일정을 연결한 새 Tracker를 만들어 주세요.",
             )
-        cursor = conn.execute("INSERT INTO trackers (name) VALUES (?)", (name,))
+        cursor = conn.execute(
+            "INSERT INTO trackers (name, weekly_target) VALUES (?, ?)",
+            (name, existing["weekly_target"]),
+        )
         new_id = cursor.lastrowid
         if dup.copy_data:
             conn.execute(
@@ -240,7 +255,7 @@ def duplicate_tracker(tracker_id: int, dup: TrackerDuplicate):
                 """,
                 (new_id, tracker_id),
             )
-    return {"id": new_id, "name": name}
+    return {"id": new_id, "name": name, "weekly_target": existing["weekly_target"]}
 
 
 @app.get("/api/trackers/{tracker_id}/entries")

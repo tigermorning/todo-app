@@ -20,7 +20,7 @@ The standout feature is **Korean natural-language quick entry**: type a sentence
 - **Recurring todos** — daily / weekly / biweekly, with an end date and optional exception date ranges (e.g. skip a vacation week). Can be created either through a structured form or the same natural-language input (`매일 9시 약 복용`, `8/3-11/5 격주 공원 산책`)
 - **Search and category filters**
 - **Overdue check** — while the app is open in your browser, it periodically flags anything past its due time that's still unchecked, and lets you mark it done, reschedule it, or snooze it. Optional browser notifications (only fire while the tab is open — there's no background service)
-- **Sidebar** — a month calendar (click a day to filter the list to it) and any number of habit trackers, each either manually clicked (blank/○/✕) or linked to a recurring todo so its days fill in automatically as you complete them (see "Sidebar" below)
+- **Sidebar** — a month calendar (click a day to filter the list to it) and any number of habit trackers: manually clicked (blank/○/✕), linked to a recurring todo so its days fill in automatically, or tracking a weekly goal (e.g. "주 2회") where the whole week highlights once you hit the target (see "Sidebar" below)
 - **Google Calendar integration (optional)** — read-only OAuth connection that surfaces upcoming calendar events as suggested todos; nothing is imported until you accept it
 
 ## Requirements
@@ -111,10 +111,11 @@ Click "상세 입력" to expand a form with an explicit title field, category pi
 ### Sidebar
 
 - **Calendar**: dots mark days with something due; click a day to filter the list to it, click "전체 보기" to clear the filter.
-- **Tracker**: create as many named habit trackers as you want (운동, 독서, 금주, ...) via the ＋ button, switch between them with the dropdown. Two modes:
+- **Tracker**: create as many named habit trackers as you want (운동, 독서, 금주, ...) via the ＋ button, switch between them with the dropdown. Three modes:
   - **Manual** (default): click a day to cycle blank → ○ (done, green) → ✕ (failed, red) → blank. Can be duplicated (with or without copying its existing entries) via the ⧉ button.
   - **Linked to a recurring todo** (pick one from the ＋ form's dropdown, e.g. "매일 운동"): the day's status is computed automatically from whether that day's todo instance is done — ○ once you check it off, auto ✕ once the day passes still unchecked, blank until then. Not manually clickable or duplicable, since its data comes entirely from the linked todos.
-  - Each tracker (either mode) renders as a calendar grid identical in size/spacing/style to the calendar above it.
+  - **Weekly goal** (check "주간 목표로 추적" and set a target, e.g. "주 2회"): for goals that aren't daily — "운동 주 2회", "독서 주 3회" — click a day to toggle a circle marking that you did it that day (no ✕ state; a day either counts or it doesn't). Once a calendar week (Sun–Sat) has enough marked days to meet the target, the entire week's background highlights. Can be duplicated like a manual tracker; mutually exclusive with linking to a recurring todo.
+  - Each tracker (any mode) renders as a calendar grid identical in size/spacing/style to the calendar above it.
 
 ### Overdue check
 

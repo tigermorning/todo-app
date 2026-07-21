@@ -116,6 +116,8 @@ def init_db():
         tracker_columns = {row["name"] for row in conn.execute("PRAGMA table_info(trackers)")}
         if "recurring_rule_id" not in tracker_columns:
             conn.execute("ALTER TABLE trackers ADD COLUMN recurring_rule_id INTEGER")
+        if "weekly_target" not in tracker_columns:
+            conn.execute("ALTER TABLE trackers ADD COLUMN weekly_target INTEGER")
 
         conn.execute(
             """
