@@ -619,15 +619,26 @@ def update_category(name: str, update: CategoryUpdate):
 
 
 @app.delete("/api/categories/{name}")
-def delete_category(name: str):
+def delete_category(name: str, cascade: bool = Query(False)):
     with get_connection() as conn:
         existing = conn.execute("SELECT id FROM categories WHERE name = ?", (name,)).fetchone()
         if existing is None:
             raise HTTPException(status_code=404, detail="해당 카테고리를 찾을 수 없습니다.")
-        conn.execute("DELETE FROM categories WHERE name = ?", (name,))
-        conn.execute("UPDATE todos SET category = '' WHERE category = ?", (name,))
-        conn.execute("UPDATE recurring_rules SET category = '' WHERE category = ?", (name,))
-    return {"name": name}
+        children = conn.execute(
+            "SELECT name FROM categories WHERE parent_id = ?", (existing["id"],)
+        ).fetchall()
+        if children and not cascade:
+            names = ", ".join(c["name"] for c in children)
+            raise HTTPException(
+                status_code=409,
+                detail=f"하위 카테고리({names})가 있습니다. 함께 삭제하려면 cascade=true로 요청하세요.",
+            )
+        names_to_delete = [name] + [c["name"] for c in children]
+        for n in names_to_delete:
+            conn.execute("DELETE FROM categories WHERE name = ?", (n,))
+            conn.execute("UPDATE todos SET category = '' WHERE category = ?", (n,))
+            conn.execute("UPDATE recurring_rules SET category = '' WHERE category = ?", (n,))
+    return {"name": name, "deleted": names_to_delete}
 
 
 @app.post("/api/todos")

@@ -91,6 +91,7 @@ const newCategorySave = document.getElementById("new-category-save");
 const newCategoryCancel = document.getElementById("new-category-cancel");
 
 const manageCategories = document.getElementById("manage-categories");
+const manageCategoriesAddParentBtn = document.getElementById("manage-categories-add-parent");
 const manageCategoriesList = document.getElementById("manage-categories-list");
 const manageCategoriesClose = document.getElementById("manage-categories-close");
 
@@ -1345,6 +1346,282 @@ categorySelect.addEventListener("change", () => {
 });
 
 let expandedCategoryGroups = new Set();
+let openCategoryMenuName = null;
+let openIconPickerName = null;
+let renamingCategoryName = null;
+
+const ICON_CHOICES = [
+  "🏃", "🚴", "🏊", "🧘", "🥗", "🍎", "💊", "😴", "🛌", "💪",
+  "📚", "📖", "📕", "✏️", "🎓", "💡", "🧠",
+  "💼", "📁", "📊", "📈", "💰", "💳", "🏦", "🧾", "📒", "🧮",
+  "🏠", "🧹", "🧺", "🛒", "🔧", "📋", "🗑️",
+  "🚗", "✈️", "🚌", "🚶", "🚲",
+  "👥", "💬", "🤝", "❤️", "💕", "👶", "🎉", "🎁",
+  "🎨", "🎮", "🎬", "🎵", "🌿", "🌳", "🌸", "☀️", "🌙", "⭐",
+  "✅", "⚠️", "🔔", "📌", "🏷️", "☕", "🍔", "📱", "💻", "⚽", "🏀",
+];
+
+function closeCategoryPopovers() {
+  openCategoryMenuName = null;
+  openIconPickerName = null;
+  renamingCategoryName = null;
+}
+
+async function saveCategoryField(category, changes) {
+  const res = await fetch(`/api/categories/${encodeURIComponent(category.name)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: category.name,
+      icon: category.icon,
+      group_key: category.group_key,
+      parent_name: category.parent_name || null,
+      ...changes,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    alert(typeof err.detail === "string" ? err.detail : "카테고리를 수정하지 못했습니다.");
+    return false;
+  }
+  await loadCategories();
+  await fetchTodos();
+  return true;
+}
+
+async function deleteCategoryWithConfirm(category, childNames) {
+  const hasChildren = childNames.length > 0;
+  const message = hasChildren
+    ? `"${category.name}"에는 하위 카테고리(${childNames.join(", ")})가 있습니다. 함께 삭제할까요?`
+    : `"${category.name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`;
+  if (!confirm(message)) return;
+
+  const url = `/api/categories/${encodeURIComponent(category.name)}${hasChildren ? "?cascade=true" : ""}`;
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json();
+    alert(typeof err.detail === "string" ? err.detail : "카테고리를 삭제하지 못했습니다.");
+    return;
+  }
+  await loadCategories();
+  await fetchTodos();
+  closeCategoryPopovers();
+  renderManageCategories();
+}
+
+function buildCategoryRow(category, isParent, subs) {
+  const li = document.createElement("li");
+  li.className = "manage-category-row";
+  if (!isParent) li.style.paddingLeft = "1.5rem";
+
+  if (isParent) {
+    const isExpanded = expandedCategoryGroups.has(category.name);
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "cat-toggle-btn";
+    if (subs.length > 0) {
+      toggleBtn.textContent = isExpanded ? "▼" : "▶";
+      toggleBtn.setAttribute("aria-label", isExpanded ? "하위 카테고리 접기" : "하위 카테고리 펼치기");
+      toggleBtn.addEventListener("click", () => {
+        if (isExpanded) expandedCategoryGroups.delete(category.name);
+        else expandedCategoryGroups.add(category.name);
+        renderManageCategories();
+      });
+    } else {
+      toggleBtn.disabled = true;
+    }
+    li.appendChild(toggleBtn);
+  }
+
+  const iconBtn = document.createElement("button");
+  iconBtn.type = "button";
+  iconBtn.className = "cat-icon-btn";
+  iconBtn.textContent = category.icon || "🏷️";
+  iconBtn.title = "아이콘 변경";
+  iconBtn.addEventListener("click", () => {
+    const wasOpen = openIconPickerName === category.name;
+    closeCategoryPopovers();
+    openIconPickerName = wasOpen ? null : category.name;
+    renderManageCategories();
+  });
+  li.appendChild(iconBtn);
+
+  if (renamingCategoryName === category.name) {
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "cat-name-input";
+    nameInput.value = category.name;
+    const confirmRename = async () => {
+      const newName = nameInput.value.trim();
+      if (!newName) return;
+      const ok = await saveCategoryField(category, { name: newName });
+      if (ok) {
+        renamingCategoryName = null;
+        renderManageCategories();
+      }
+    };
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmRename();
+      if (e.key === "Escape") {
+        renamingCategoryName = null;
+        renderManageCategories();
+      }
+    });
+    const renameSaveBtn = document.createElement("button");
+    renameSaveBtn.type = "button";
+    renameSaveBtn.className = "cat-save-btn";
+    renameSaveBtn.textContent = "저장";
+    renameSaveBtn.addEventListener("click", confirmRename);
+    const renameCancelBtn = document.createElement("button");
+    renameCancelBtn.type = "button";
+    renameCancelBtn.className = "cat-cancel-btn";
+    renameCancelBtn.textContent = "취소";
+    renameCancelBtn.addEventListener("click", () => {
+      renamingCategoryName = null;
+      renderManageCategories();
+    });
+    li.append(nameInput, renameSaveBtn, renameCancelBtn);
+    requestAnimationFrame(() => nameInput.focus());
+  } else {
+    const nameLabel = document.createElement("span");
+    nameLabel.className = "cat-name-label";
+    nameLabel.textContent = category.name;
+    li.appendChild(nameLabel);
+  }
+
+  const groupSelect = document.createElement("select");
+  groupSelect.className = "cat-group-select";
+  for (const group of groupsCache) {
+    const option = document.createElement("option");
+    option.value = group.key;
+    option.textContent = group.label;
+    if (group.key === category.group_key) option.selected = true;
+    groupSelect.appendChild(option);
+  }
+  groupSelect.addEventListener("change", async () => {
+    await saveCategoryField(category, { group_key: groupSelect.value });
+    renderManageCategories();
+  });
+  li.appendChild(groupSelect);
+
+  const menuBtn = document.createElement("button");
+  menuBtn.type = "button";
+  menuBtn.className = "cat-menu-btn";
+  menuBtn.textContent = "⋮";
+  menuBtn.setAttribute("aria-label", "카테고리 메뉴");
+  menuBtn.addEventListener("click", () => {
+    const wasOpen = openCategoryMenuName === category.name;
+    closeCategoryPopovers();
+    openCategoryMenuName = wasOpen ? null : category.name;
+    renderManageCategories();
+  });
+  li.appendChild(menuBtn);
+
+  return li;
+}
+
+function buildIconPickerRow(category, indent) {
+  const li = document.createElement("li");
+  li.className = "manage-category-row cat-icon-picker-row";
+  if (indent) li.style.paddingLeft = "1.5rem";
+
+  const grid = document.createElement("div");
+  grid.className = "icon-picker-grid";
+  for (const emoji of ICON_CHOICES) {
+    const choiceBtn = document.createElement("button");
+    choiceBtn.type = "button";
+    choiceBtn.className = "icon-picker-choice";
+    if (emoji === category.icon) choiceBtn.classList.add("selected");
+    choiceBtn.textContent = emoji;
+    choiceBtn.addEventListener("click", async () => {
+      const ok = await saveCategoryField(category, { icon: emoji });
+      if (ok) {
+        openIconPickerName = null;
+        renderManageCategories();
+      }
+    });
+    grid.appendChild(choiceBtn);
+  }
+  li.appendChild(grid);
+
+  const customRow = document.createElement("div");
+  customRow.className = "icon-picker-custom-row";
+  const customInput = document.createElement("input");
+  customInput.type = "text";
+  customInput.maxLength = 4;
+  customInput.placeholder = "직접 입력(이모지)";
+  const customApplyBtn = document.createElement("button");
+  customApplyBtn.type = "button";
+  customApplyBtn.textContent = "적용";
+  customApplyBtn.addEventListener("click", async () => {
+    const value = customInput.value.trim();
+    if (!value) return;
+    const ok = await saveCategoryField(category, { icon: value });
+    if (ok) {
+      openIconPickerName = null;
+      renderManageCategories();
+    }
+  });
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.textContent = "닫기";
+  closeBtn.addEventListener("click", () => {
+    openIconPickerName = null;
+    renderManageCategories();
+  });
+  customRow.append(customInput, customApplyBtn, closeBtn);
+  li.appendChild(customRow);
+
+  return li;
+}
+
+function buildMenuActionsRow(category, isParent, childNames, indent) {
+  const li = document.createElement("li");
+  li.className = "manage-category-row cat-menu-actions-row";
+  if (indent) li.style.paddingLeft = "1.5rem";
+
+  const renameBtn = document.createElement("button");
+  renameBtn.type = "button";
+  renameBtn.textContent = "이름 수정";
+  renameBtn.addEventListener("click", () => {
+    openCategoryMenuName = null;
+    renamingCategoryName = category.name;
+    renderManageCategories();
+  });
+
+  const iconBtn = document.createElement("button");
+  iconBtn.type = "button";
+  iconBtn.textContent = "아이콘 변경";
+  iconBtn.addEventListener("click", () => {
+    openCategoryMenuName = null;
+    openIconPickerName = category.name;
+    renderManageCategories();
+  });
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "cat-delete-btn";
+  deleteBtn.textContent = "삭제";
+  deleteBtn.addEventListener("click", () => deleteCategoryWithConfirm(category, childNames));
+
+  li.append(renameBtn, iconBtn, deleteBtn);
+
+  if (isParent) {
+    const addSubBtn = document.createElement("button");
+    addSubBtn.type = "button";
+    addSubBtn.textContent = "+ 하위 카테고리 추가";
+    addSubBtn.addEventListener("click", () => {
+      closeCategoryPopovers();
+      renderManageCategories();
+      newCategoryParent.value = category.name;
+      newCategoryForm.hidden = false;
+      newCategoryName.focus();
+    });
+    li.appendChild(addSubBtn);
+  }
+
+  return li;
+}
 
 function renderManageCategories() {
   manageCategoriesList.innerHTML = "";
@@ -1356,162 +1633,40 @@ function renderManageCategories() {
     const subs = children.filter((ch) => ch.parent_name === c.name);
     const isExpanded = expandedCategoryGroups.has(c.name);
 
-    const li = document.createElement("li");
-    li.className = "manage-category-row";
-
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "cat-toggle-btn";
-    if (subs.length > 0) {
-      toggleBtn.textContent = isExpanded ? "▼" : "▶";
-      toggleBtn.setAttribute("aria-label", isExpanded ? "하위 카테고리 접기" : "하위 카테고리 펼치기");
-      toggleBtn.addEventListener("click", () => {
-        if (isExpanded) {
-          expandedCategoryGroups.delete(c.name);
-        } else {
-          expandedCategoryGroups.add(c.name);
-        }
-        renderManageCategories();
-      });
-    } else {
-      toggleBtn.disabled = true;
+    manageCategoriesList.appendChild(buildCategoryRow(c, true, subs));
+    if (openIconPickerName === c.name) {
+      manageCategoriesList.appendChild(buildIconPickerRow(c, false));
     }
-
-    const iconInput = document.createElement("input");
-    iconInput.type = "text";
-    iconInput.className = "cat-icon-input";
-    iconInput.maxLength = 4;
-    iconInput.value = c.icon;
-
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.className = "cat-name-input";
-    nameInput.value = c.name;
-
-    const groupSelect = document.createElement("select");
-    for (const group of groupsCache) {
-      const option = document.createElement("option");
-      option.value = group.key;
-      option.textContent = group.label;
-      if (group.key === c.group_key) option.selected = true;
-      groupSelect.appendChild(option);
+    if (openCategoryMenuName === c.name) {
+      manageCategoriesList.appendChild(
+        buildMenuActionsRow(c, true, subs.map((s) => s.name), false)
+      );
     }
-
-    const saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.className = "cat-save-btn";
-    saveBtn.textContent = "저장";
-    saveBtn.addEventListener("click", async () => {
-      const res = await fetch(`/api/categories/${encodeURIComponent(c.name)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameInput.value.trim(),
-          icon: iconInput.value.trim(),
-          group_key: groupSelect.value,
-          parent_name: null,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.detail || "카테고리를 수정하지 못했습니다.");
-        return;
-      }
-      await loadCategories();
-      await fetchTodos();
-      renderManageCategories();
-    });
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "cat-delete-btn";
-    deleteBtn.textContent = "삭제";
-    deleteBtn.addEventListener("click", async () => {
-      if (!confirm(`"${c.name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`)) {
-        return;
-      }
-      await fetch(`/api/categories/${encodeURIComponent(c.name)}`, { method: "DELETE" });
-      await loadCategories();
-      await fetchTodos();
-      renderManageCategories();
-    });
-
-    li.append(toggleBtn, iconInput, nameInput, groupSelect, saveBtn, deleteBtn);
-    manageCategoriesList.appendChild(li);
 
     if (!isExpanded) continue;
 
     for (const sub of subs) {
-      const subLi = document.createElement("li");
-      subLi.className = "manage-category-row";
-      subLi.style.paddingLeft = "1.5rem";
-
-      const subIconInput = document.createElement("input");
-      subIconInput.type = "text";
-      subIconInput.className = "cat-icon-input";
-      subIconInput.maxLength = 4;
-      subIconInput.value = sub.icon;
-
-      const subNameInput = document.createElement("input");
-      subNameInput.type = "text";
-      subNameInput.className = "cat-name-input";
-      subNameInput.value = sub.name;
-
-      const subGroupSelect = document.createElement("select");
-      for (const group of groupsCache) {
-        const option = document.createElement("option");
-        option.value = group.key;
-        option.textContent = group.label;
-        if (group.key === sub.group_key) option.selected = true;
-        subGroupSelect.appendChild(option);
+      manageCategoriesList.appendChild(buildCategoryRow(sub, false, []));
+      if (openIconPickerName === sub.name) {
+        manageCategoriesList.appendChild(buildIconPickerRow(sub, true));
       }
-
-      const subSaveBtn = document.createElement("button");
-      subSaveBtn.type = "button";
-      subSaveBtn.className = "cat-save-btn";
-      subSaveBtn.textContent = "저장";
-      subSaveBtn.addEventListener("click", async () => {
-        const res = await fetch(`/api/categories/${encodeURIComponent(sub.name)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: subNameInput.value.trim(),
-            icon: subIconInput.value.trim(),
-            group_key: subGroupSelect.value,
-            parent_name: c.name,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          alert(err.detail || "카테고리를 수정하지 못했습니다.");
-          return;
-        }
-        await loadCategories();
-        await fetchTodos();
-        renderManageCategories();
-      });
-
-      const subDeleteBtn = document.createElement("button");
-      subDeleteBtn.type = "button";
-      subDeleteBtn.className = "cat-delete-btn";
-      subDeleteBtn.textContent = "삭제";
-      subDeleteBtn.addEventListener("click", async () => {
-        if (!confirm(`"${sub.name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`)) {
-          return;
-        }
-        await fetch(`/api/categories/${encodeURIComponent(sub.name)}`, { method: "DELETE" });
-        await loadCategories();
-        await fetchTodos();
-        renderManageCategories();
-      });
-
-      subLi.append(subIconInput, subNameInput, subGroupSelect, subSaveBtn, subDeleteBtn);
-      manageCategoriesList.appendChild(subLi);
+      if (openCategoryMenuName === sub.name) {
+        manageCategoriesList.appendChild(buildMenuActionsRow(sub, false, [], true));
+      }
     }
   }
 }
 
+manageCategoriesAddParentBtn.addEventListener("click", () => {
+  closeCategoryPopovers();
+  renderManageCategories();
+  newCategoryParent.value = "";
+  newCategoryForm.hidden = false;
+  newCategoryName.focus();
+});
+
 manageCategoriesClose.addEventListener("click", () => {
+  closeCategoryPopovers();
   manageCategories.hidden = true;
 });
 
@@ -1551,6 +1706,7 @@ newCategorySave.addEventListener("click", async () => {
   newCategoryName.value = "";
   newCategoryIcon.value = "";
   newCategoryParent.value = "";
+  if (!manageCategories.hidden) renderManageCategories();
 });
 
 searchInput.addEventListener("input", () => fetchTodos());
