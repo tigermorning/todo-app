@@ -142,6 +142,52 @@ class TodoCLI:
         for r in rules:
             print(f"#{r['id']} {r['title']}  ({r['freq']} / {r.get('category', '')})")
 
+    def summary(self, date=None):
+        """특정 날짜의 할 일을 시간대별로 요약합니다 (기본: 오늘)."""
+        target_date = date or datetime.now().strftime("%Y-%m-%d")
+        todos = _api("GET", "/api/todos", params={"date": target_date})
+        total = len(todos)
+        done = sum(1 for t in todos if t["done"])
+        rate = f"{done / total * 100:.1f}%" if total else "N/A"
+
+        buckets = {
+            "새벽(0~5시)": [],
+            "오전(6~11시)": [],
+            "오후(12~17시)": [],
+            "저녁(18~23시)": [],
+        }
+        no_time = []
+        for t in todos:
+            due = t.get("due_at")
+            hour = None
+            if due:
+                try:
+                    hour = datetime.strptime(due, "%Y-%m-%d %H:%M").hour
+                except ValueError:
+                    hour = None
+            if hour is None:
+                no_time.append(t)
+            elif hour <= 5:
+                buckets["새벽(0~5시)"].append(t)
+            elif hour <= 11:
+                buckets["오전(6~11시)"].append(t)
+            elif hour <= 17:
+                buckets["오후(12~17시)"].append(t)
+            else:
+                buckets["저녁(18~23시)"].append(t)
+
+        print(f"[{target_date}] 전체 {total}건, 완료 {done}건 ({rate})")
+        for label, items in buckets.items():
+            if not items:
+                continue
+            print(f"\n{label}")
+            for t in items:
+                print(f"  {_format_done(t['done'])} {t['title']}  ({_format_due(t.get('due_at'))})")
+        if no_time:
+            print("\n시간 미정")
+            for t in no_time:
+                print(f"  {_format_done(t['done'])} {t['title']}")
+
     def balance(self, period="week", today=False, date=None):
         """완료한 할 일을 카테고리 그룹별 비중으로 보여줍니다.
 
