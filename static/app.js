@@ -30,6 +30,14 @@ const list = document.getElementById("todo-list");
 
 const suggestionsSection = document.getElementById("suggestions-section");
 const suggestionsList = document.getElementById("suggestions-list");
+const suggestionsSelectAllBtn = document.getElementById("suggestions-select-all-btn");
+const suggestionsBulkActions = document.getElementById("suggestions-bulk-actions");
+const suggestionsBulkCount = document.getElementById("suggestions-bulk-count");
+const suggestionsBulkAcceptBtn = document.getElementById("suggestions-bulk-accept-btn");
+const suggestionsBulkClearBtn = document.getElementById("suggestions-bulk-clear-btn");
+
+let currentSuggestions = [];
+let selectedSuggestionIds = new Set();
 
 const calendarPrev = document.getElementById("calendar-prev");
 const calendarNext = document.getElementById("calendar-next");
@@ -366,11 +374,65 @@ async function fetchSuggestions() {
   renderSuggestions(suggestions);
 }
 
+async function acceptSuggestion(s) {
+  await fetch("/api/calendar/suggestions/accept", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event_id: s.event_id, title: s.title, due_at: s.due_at }),
+  });
+}
+
+function updateSuggestionsBulkBar() {
+  const count = selectedSuggestionIds.size;
+  suggestionsBulkActions.hidden = count === 0;
+  suggestionsBulkCount.textContent = count > 0 ? `${count}개 선택됨` : "";
+}
+
+async function bulkAcceptSuggestions(ids) {
+  const targets = currentSuggestions.filter((s) => ids.includes(s.event_id));
+  await Promise.all(targets.map((s) => acceptSuggestion(s)));
+  selectedSuggestionIds.clear();
+  await fetchSuggestions();
+  await fetchTodos();
+  await renderCalendar();
+}
+
+suggestionsSelectAllBtn.addEventListener("click", () => {
+  selectedSuggestionIds = new Set(currentSuggestions.map((s) => s.event_id));
+  renderSuggestions(currentSuggestions);
+});
+
+suggestionsBulkAcceptBtn.addEventListener("click", () => {
+  bulkAcceptSuggestions([...selectedSuggestionIds]);
+});
+
+suggestionsBulkClearBtn.addEventListener("click", () => {
+  selectedSuggestionIds.clear();
+  renderSuggestions(currentSuggestions);
+});
+
 function renderSuggestions(suggestions) {
+  currentSuggestions = suggestions;
+  const liveIds = new Set(suggestions.map((s) => s.event_id));
+  selectedSuggestionIds = new Set([...selectedSuggestionIds].filter((id) => liveIds.has(id)));
+
   suggestionsSection.hidden = suggestions.length === 0;
   suggestionsList.innerHTML = "";
+  updateSuggestionsBulkBar();
   for (const s of suggestions) {
     const li = document.createElement("li");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedSuggestionIds.has(s.event_id);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        selectedSuggestionIds.add(s.event_id);
+      } else {
+        selectedSuggestionIds.delete(s.event_id);
+      }
+      updateSuggestionsBulkBar();
+    });
 
     const titleSpan = document.createElement("span");
     titleSpan.className = "todo-title";
@@ -389,11 +451,8 @@ function renderSuggestions(suggestions) {
     const acceptBtn = document.createElement("button");
     acceptBtn.textContent = "추가";
     acceptBtn.addEventListener("click", async () => {
-      await fetch("/api/calendar/suggestions/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_id: s.event_id, title: s.title, due_at: s.due_at }),
-      });
+      await acceptSuggestion(s);
+      selectedSuggestionIds.delete(s.event_id);
       await fetchSuggestions();
       await fetchTodos();
       await renderCalendar();
@@ -403,13 +462,14 @@ function renderSuggestions(suggestions) {
     ignoreBtn.textContent = "무시";
     ignoreBtn.className = "delete-btn";
     ignoreBtn.addEventListener("click", async () => {
+      selectedSuggestionIds.delete(s.event_id);
       await fetch(`/api/calendar/suggestions/${encodeURIComponent(s.event_id)}/ignore`, {
         method: "POST",
       });
       await fetchSuggestions();
     });
 
-    li.append(titleSpan, timeSpan, calendarSpan, acceptBtn, ignoreBtn);
+    li.append(checkbox, titleSpan, timeSpan, calendarSpan, acceptBtn, ignoreBtn);
     suggestionsList.appendChild(li);
   }
 }

@@ -134,7 +134,7 @@ This step requires your own Google account — it can't be done on your behalf, 
    python setup_google_calendar.py
    ```
 
-6. Restart the server. Upcoming events now appear as suggested todos; accepting one saves it, ignoring it hides it going forward.
+6. Restart the server. Upcoming events now appear as suggested todos; accepting one saves it, ignoring it hides it going forward. Check the boxes next to several suggestions (or click "전체 선택" to check them all) to accept a batch at once instead of one by one.
 
 **Multiple calendars, including other Google accounts**: suggestions come from every calendar that's currently checked/visible in this account's own Google Calendar ("다른 캘린더" list on the left of calendar.google.com) — not just the primary one. So if you share a calendar from a different Google account with this one (or subscribe to it), and leave its checkbox turned on, its events show up here too, tagged with that calendar's name. Uncheck a calendar in Google Calendar to stop it from appearing here.
 

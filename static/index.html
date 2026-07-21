@@ -142,7 +142,15 @@
 
     <div id="suggestions-section" hidden>
       <h2>제안된 할 일 (구글 캘린더)</h2>
+      <div id="suggestions-select-all-row">
+        <button type="button" id="suggestions-select-all-btn">전체 선택</button>
+      </div>
       <ul id="suggestions-list"></ul>
+      <div id="suggestions-bulk-actions" hidden>
+        <span id="suggestions-bulk-count"></span>
+        <button type="button" id="suggestions-bulk-accept-btn">선택 추가</button>
+        <button type="button" id="suggestions-bulk-clear-btn">선택 해제</button>
+      </div>
     </div>
 
     <div id="filter-bar">
