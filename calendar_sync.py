@@ -34,13 +34,20 @@ def get_credentials():
     return creds
 
 
+KST = timezone(timedelta(hours=9))
+
+
 def _normalize_event(event, calendar_id, calendar_name):
-    start = event["start"].get("dateTime", event["start"].get("date"))
-    if "T" in start:
-        # "2026-07-25T13:00:00+09:00" -> "2026-07-25 13:00"
-        due_at = start[:16].replace("T", " ")
+    raw_datetime = event["start"].get("dateTime")
+    if raw_datetime:
+        # 캘린더마다 기본 시간대가 다를 수 있다(예: 해외 서비스가 발급한
+        # 구독용 캘린더는 UTC인 경우가 흔함) — 문자열을 그대로 자르면 그
+        # 시간대를 한국 시간인 것처럼 착각해서 시간이 어긋난다. 실제
+        # 오프셋을 파싱해 한국 시간(KST)으로 변환해야 한다.
+        dt = datetime.fromisoformat(raw_datetime.replace("Z", "+00:00"))
+        due_at = dt.astimezone(KST).strftime("%Y-%m-%d %H:%M")
     else:
-        due_at = f"{start} 00:00"
+        due_at = f"{event['start']['date']} 00:00"
     return {
         # 캘린더가 여러 개면 이벤트 ID가 서로 다른 캘린더에 속해도 문자열
         # 자체는 우연히 같을 수 있으니(이론상), calendar_id를 붙여 항상
