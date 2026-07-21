@@ -380,6 +380,12 @@ function renderSuggestions(suggestions) {
     timeSpan.className = "todo-time";
     timeSpan.textContent = formatTimestamp(s.due_at);
 
+    const calendarSpan = document.createElement("span");
+    if (s.calendar) {
+      calendarSpan.className = "suggestion-calendar";
+      calendarSpan.textContent = s.calendar;
+    }
+
     const acceptBtn = document.createElement("button");
     acceptBtn.textContent = "추가";
     acceptBtn.addEventListener("click", async () => {
@@ -403,7 +409,7 @@ function renderSuggestions(suggestions) {
       await fetchSuggestions();
     });
 
-    li.append(titleSpan, timeSpan, acceptBtn, ignoreBtn);
+    li.append(titleSpan, timeSpan, calendarSpan, acceptBtn, ignoreBtn);
     suggestionsList.appendChild(li);
   }
 }

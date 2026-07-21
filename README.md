@@ -136,6 +136,8 @@ This step requires your own Google account — it can't be done on your behalf, 
 
 6. Restart the server. Upcoming events now appear as suggested todos; accepting one saves it, ignoring it hides it going forward.
 
+**Multiple calendars, including other Google accounts**: suggestions come from every calendar that's currently checked/visible in this account's own Google Calendar ("다른 캘린더" list on the left of calendar.google.com) — not just the primary one. So if you share a calendar from a different Google account with this one (or subscribe to it), and leave its checkbox turned on, its events show up here too, tagged with that calendar's name. Uncheck a calendar in Google Calendar to stop it from appearing here.
+
 ## Project structure
 
 ```

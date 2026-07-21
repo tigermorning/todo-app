@@ -401,6 +401,15 @@ h1 {
   color: #ff3b30;
 }
 
+.suggestion-calendar {
+  font-size: 0.7rem;
+  color: #6e6e73;
+  background: #f0f0f2;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+}
+
 #quick-form {
   display: flex;
   gap: 0.5rem;
@@ -1022,5 +1031,9 @@ h1 {
   }
   #suggestions-section {
     background: #1e3a5f;
+  }
+  .suggestion-calendar {
+    background: #3a3a3c;
+    color: #98989d;
   }
 }
