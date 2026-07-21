@@ -15,28 +15,42 @@
         <span id="calendar-label"></span>
         <button type="button" id="calendar-next">▶</button>
       </div>
-      <div id="calendar-weekdays">
+      <div id="calendar-weekdays" class="grid-weekdays">
         <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
       </div>
-      <div id="calendar-grid"></div>
+      <div id="calendar-grid" class="grid-calendar"></div>
       <button type="button" id="calendar-clear" hidden>전체 보기</button>
     </div>
     <div id="tracker">
-      <div id="tracker-header">완료 기록</div>
-      <div id="tracker-grid"></div>
-    </div>
-    <div id="news-widget">
-      <div id="news-header">
-        <select id="news-category">
-          <option value="politics">정치</option>
-          <option value="economy">경제</option>
-          <option value="society">사회</option>
-          <option value="it">IT</option>
-          <option value="sports">스포츠</option>
-          <option value="world">세계</option>
-        </select>
+      <div id="tracker-toolbar">
+        <select id="tracker-select"></select>
+        <button type="button" id="tracker-new-btn" title="새 Tracker">＋</button>
+        <button type="button" id="tracker-duplicate-btn" title="복제">⧉</button>
       </div>
-      <ul id="news-list"></ul>
+      <div id="tracker-new-form" hidden>
+        <input type="text" id="tracker-new-name" placeholder="Tracker 이름 (예: 운동)" autocomplete="off" />
+        <select id="tracker-new-link">
+          <option value="">직접 기록 (수동)</option>
+        </select>
+        <div class="field-row">
+          <button type="button" id="tracker-new-save">만들기</button>
+          <button type="button" id="tracker-new-cancel">취소</button>
+        </div>
+      </div>
+      <div id="tracker-duplicate-form" hidden>
+        <input type="text" id="tracker-duplicate-name" placeholder="새 이름 (예: 운동(저녁))" autocomplete="off" />
+        <label id="tracker-duplicate-copy-row"><input type="checkbox" id="tracker-duplicate-copy" /> 기존 기록도 복사</label>
+        <div class="field-row">
+          <button type="button" id="tracker-duplicate-save">복제</button>
+          <button type="button" id="tracker-duplicate-cancel">취소</button>
+        </div>
+      </div>
+      <div id="tracker-header"></div>
+      <div id="tracker-weekdays" class="grid-weekdays">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div id="tracker-grid" class="grid-calendar"></div>
+      <p id="tracker-empty" hidden>아직 Tracker가 없습니다. ＋ 버튼으로 만들어보세요.</p>
     </div>
   </aside>
   <main>

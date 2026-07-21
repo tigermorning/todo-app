@@ -103,3 +103,28 @@ def init_db():
             )
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trackers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            )
+            """
+        )
+        tracker_columns = {row["name"] for row in conn.execute("PRAGMA table_info(trackers)")}
+        if "recurring_rule_id" not in tracker_columns:
+            conn.execute("ALTER TABLE trackers ADD COLUMN recurring_rule_id INTEGER")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tracker_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tracker_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                UNIQUE(tracker_id, date)
+            )
+            """
+        )

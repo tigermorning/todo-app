@@ -4,7 +4,6 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-import feedparser
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -136,6 +135,20 @@ class RecurringRuleCreate(BaseModel):
     exceptions: List[List[str]] = []
 
 
+class TrackerCreate(BaseModel):
+    name: str
+    recurring_rule_id: Optional[int] = None
+
+
+class TrackerDuplicate(BaseModel):
+    name: str
+    copy_data: bool = False
+
+
+class TrackerEntryUpdate(BaseModel):
+    status: Optional[str] = None
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
@@ -167,8 +180,71 @@ def list_todos(
     return [dict(row) for row in rows]
 
 
-@app.get("/api/tracker")
-def get_tracker(year: Optional[int] = None, month: Optional[int] = None):
+@app.get("/api/trackers")
+def list_trackers():
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT t.id, t.name, t.created_at, t.recurring_rule_id, r.title AS recurring_title
+            FROM trackers t
+            LEFT JOIN recurring_rules r ON r.id = t.recurring_rule_id
+            ORDER BY t.id
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.post("/api/trackers")
+def create_tracker(tracker: TrackerCreate):
+    name = tracker.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="이름은 비어 있을 수 없습니다.")
+    with get_connection() as conn:
+        if tracker.recurring_rule_id is not None:
+            rule = conn.execute(
+                "SELECT id FROM recurring_rules WHERE id = ?", (tracker.recurring_rule_id,)
+            ).fetchone()
+            if rule is None:
+                raise HTTPException(status_code=404, detail="해당 반복 일정을 찾을 수 없습니다.")
+        cursor = conn.execute(
+            "INSERT INTO trackers (name, recurring_rule_id) VALUES (?, ?)",
+            (name, tracker.recurring_rule_id),
+        )
+        new_id = cursor.lastrowid
+    return {"id": new_id, "name": name, "recurring_rule_id": tracker.recurring_rule_id}
+
+
+@app.post("/api/trackers/{tracker_id}/duplicate")
+def duplicate_tracker(tracker_id: int, dup: TrackerDuplicate):
+    name = dup.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="이름은 비어 있을 수 없습니다.")
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id, recurring_rule_id FROM trackers WHERE id = ?", (tracker_id,)
+        ).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="해당 Tracker를 찾을 수 없습니다.")
+        if existing["recurring_rule_id"] is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="반복 일정과 연동된 Tracker는 복제할 수 없습니다. 다른 일정을 연결한 새 Tracker를 만들어 주세요.",
+            )
+        cursor = conn.execute("INSERT INTO trackers (name) VALUES (?)", (name,))
+        new_id = cursor.lastrowid
+        if dup.copy_data:
+            conn.execute(
+                """
+                INSERT INTO tracker_entries (tracker_id, date, status)
+                SELECT ?, date, status FROM tracker_entries WHERE tracker_id = ?
+                """,
+                (new_id, tracker_id),
+            )
+    return {"id": new_id, "name": name}
+
+
+@app.get("/api/trackers/{tracker_id}/entries")
+def get_tracker_entries(tracker_id: int, year: Optional[int] = None, month: Optional[int] = None):
     today = date.today()
     year = year or today.year
     month = month or today.month
@@ -177,65 +253,90 @@ def get_tracker(year: Optional[int] = None, month: Optional[int] = None):
     end = next_month - timedelta(days=1)
 
     with get_connection() as conn:
+        tracker = conn.execute(
+            "SELECT id, recurring_rule_id FROM trackers WHERE id = ?", (tracker_id,)
+        ).fetchone()
+        if tracker is None:
+            raise HTTPException(status_code=404, detail="해당 Tracker를 찾을 수 없습니다.")
+
+        if tracker["recurring_rule_id"] is not None:
+            rows = conn.execute(
+                """
+                SELECT substr(due_at, 1, 10) AS day, MAX(done) AS done
+                FROM todos
+                WHERE recurring_rule_id = ?
+                  AND due_at IS NOT NULL
+                  AND substr(due_at, 1, 10) >= ? AND substr(due_at, 1, 10) <= ?
+                GROUP BY day
+                """,
+                (tracker["recurring_rule_id"], start.isoformat(), end.isoformat()),
+            ).fetchall()
+            todo_by_day = {row["day"]: row["done"] for row in rows}
+            today_iso = today.isoformat()
+            days = []
+            cursor_day = start
+            while cursor_day <= end:
+                iso = cursor_day.isoformat()
+                if iso not in todo_by_day:
+                    status = None
+                elif todo_by_day[iso]:
+                    status = "done"
+                elif iso < today_iso:
+                    status = "failed"
+                else:
+                    status = None
+                days.append({"date": iso, "day": cursor_day.day, "status": status})
+                cursor_day += timedelta(days=1)
+            return {"year": year, "month": month, "days": days, "linked": True}
+
         rows = conn.execute(
-            """
-            SELECT substr(due_at, 1, 10) AS day, COUNT(*) AS total, SUM(done) AS done_count
-            FROM todos
-            WHERE due_at IS NOT NULL
-              AND substr(due_at, 1, 10) >= ?
-              AND substr(due_at, 1, 10) <= ?
-            GROUP BY day
-            """,
-            (start.isoformat(), end.isoformat()),
+            "SELECT date, status FROM tracker_entries WHERE tracker_id = ? AND date >= ? AND date <= ?",
+            (tracker_id, start.isoformat(), end.isoformat()),
         ).fetchall()
-    stats = {row["day"]: (row["total"], row["done_count"]) for row in rows}
+
+    statuses = {row["date"]: row["status"] for row in rows}
     days = []
     cursor_day = start
     while cursor_day <= end:
         iso = cursor_day.isoformat()
-        total, done_count = stats.get(iso, (0, 0))
-        rate = round(done_count / total * 100) if total else 0
-        days.append(
-            {"date": iso, "day": cursor_day.day, "total": total, "done": done_count, "rate": rate}
-        )
+        days.append({"date": iso, "day": cursor_day.day, "status": statuses.get(iso)})
         cursor_day += timedelta(days=1)
-    return {"year": year, "month": month, "days": days}
+    return {"year": year, "month": month, "days": days, "linked": False}
 
 
-NEWS_FEEDS = {
-    "politics": ("정치", "https://www.khan.co.kr/rss/rssdata/politic_news.xml"),
-    "economy": ("경제", "https://www.khan.co.kr/rss/rssdata/economy_news.xml"),
-    "society": ("사회", "https://www.khan.co.kr/rss/rssdata/society_news.xml"),
-    "it": ("IT", "https://www.khan.co.kr/rss/rssdata/it_news.xml"),
-    "sports": ("스포츠", "https://www.khan.co.kr/rss/rssdata/kh_sports.xml"),
-    "world": ("세계", "https://www.khan.co.kr/rss/rssdata/world_news.xml"),
-}
-_NEWS_CACHE_TTL = 600
-_news_cache = {}
+@app.put("/api/trackers/{tracker_id}/entries/{entry_date}")
+def set_tracker_entry(tracker_id: int, entry_date: str, update: TrackerEntryUpdate):
+    try:
+        datetime.strptime(entry_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD 이어야 합니다.")
+    if update.status is not None and update.status not in ("done", "failed"):
+        raise HTTPException(status_code=400, detail="status는 done, failed 중 하나이거나 비어 있어야 합니다.")
 
-
-@app.get("/api/news")
-def get_news(category: str = "politics"):
-    if category not in NEWS_FEEDS:
-        raise HTTPException(status_code=400, detail="지원하지 않는 카테고리입니다.")
-
-    cached = _news_cache.get(category)
-    now = datetime.now()
-    if cached and (now - cached["fetched_at"]).total_seconds() < _NEWS_CACHE_TTL:
-        return {"category": category, "articles": cached["articles"]}
-
-    label, url = NEWS_FEEDS[category]
-    feed = feedparser.parse(url)
-    articles = [
-        {
-            "title": entry.get("title", ""),
-            "link": entry.get("link", ""),
-            "published": entry.get("published", ""),
-        }
-        for entry in feed.entries[:10]
-    ]
-    _news_cache[category] = {"fetched_at": now, "articles": articles}
-    return {"category": category, "articles": articles}
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id, recurring_rule_id FROM trackers WHERE id = ?", (tracker_id,)
+        ).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="해당 Tracker를 찾을 수 없습니다.")
+        if existing["recurring_rule_id"] is not None:
+            raise HTTPException(
+                status_code=400, detail="반복 일정과 연동된 Tracker는 직접 기록할 수 없습니다."
+            )
+        if update.status is None:
+            conn.execute(
+                "DELETE FROM tracker_entries WHERE tracker_id = ? AND date = ?",
+                (tracker_id, entry_date),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO tracker_entries (tracker_id, date, status) VALUES (?, ?, ?)
+                ON CONFLICT(tracker_id, date) DO UPDATE SET status = excluded.status
+                """,
+                (tracker_id, entry_date, update.status),
+            )
+    return {"tracker_id": tracker_id, "date": entry_date, "status": update.status}
 
 
 @app.get("/api/groups")

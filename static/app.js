@@ -36,9 +36,27 @@ const calendarNext = document.getElementById("calendar-next");
 const calendarLabel = document.getElementById("calendar-label");
 const calendarGrid = document.getElementById("calendar-grid");
 const calendarClear = document.getElementById("calendar-clear");
+
+const trackerSelect = document.getElementById("tracker-select");
+const trackerNewBtn = document.getElementById("tracker-new-btn");
+const trackerDuplicateBtn = document.getElementById("tracker-duplicate-btn");
+const trackerNewForm = document.getElementById("tracker-new-form");
+const trackerNewName = document.getElementById("tracker-new-name");
+const trackerNewLink = document.getElementById("tracker-new-link");
+const trackerNewSave = document.getElementById("tracker-new-save");
+const trackerNewCancel = document.getElementById("tracker-new-cancel");
+const trackerDuplicateForm = document.getElementById("tracker-duplicate-form");
+const trackerDuplicateName = document.getElementById("tracker-duplicate-name");
+const trackerDuplicateCopy = document.getElementById("tracker-duplicate-copy");
+const trackerDuplicateSave = document.getElementById("tracker-duplicate-save");
+const trackerDuplicateCancel = document.getElementById("tracker-duplicate-cancel");
+const trackerHeaderEl = document.getElementById("tracker-header");
+const trackerWeekdaysEl = document.getElementById("tracker-weekdays");
 const trackerGrid = document.getElementById("tracker-grid");
-const newsCategorySelect = document.getElementById("news-category");
-const newsList = document.getElementById("news-list");
+const trackerEmpty = document.getElementById("tracker-empty");
+let trackers = [];
+let currentTrackerId = null;
+
 
 const overdueSection = document.getElementById("overdue-section");
 const overdueList = document.getElementById("overdue-list");
@@ -461,75 +479,171 @@ calendarClear.addEventListener("click", () => {
   fetchTodos();
 });
 
+async function loadTrackers() {
+  const res = await fetch("/api/trackers");
+  trackers = await res.json();
+
+  trackerSelect.innerHTML = "";
+  for (const t of trackers) {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.recurring_rule_id ? `🔗 ${t.name}` : t.name;
+    trackerSelect.appendChild(opt);
+  }
+
+  if (trackers.length === 0) {
+    currentTrackerId = null;
+  } else if (!trackers.some((t) => t.id === currentTrackerId)) {
+    currentTrackerId = trackers[0].id;
+  }
+  if (currentTrackerId != null) trackerSelect.value = currentTrackerId;
+}
+
 async function renderTracker() {
-  const res = await fetch("/api/tracker");
+  await loadTrackers();
+
+  const hasTracker = currentTrackerId != null;
+  const current = trackers.find((t) => t.id === currentTrackerId);
+  const isLinked = !!(current && current.recurring_rule_id);
+
+  trackerSelect.hidden = !hasTracker;
+  trackerDuplicateBtn.hidden = !hasTracker || isLinked;
+  trackerWeekdaysEl.hidden = !hasTracker;
+  trackerGrid.hidden = !hasTracker;
+  trackerEmpty.hidden = hasTracker;
+
+  if (!hasTracker) {
+    trackerHeaderEl.textContent = "";
+    trackerGrid.innerHTML = "";
+    return;
+  }
+
+  const res = await fetch(`/api/trackers/${currentTrackerId}/entries`);
   const data = await res.json();
   const days = data.days || [];
-  if (days.length === 0) return;
-
-  let { year, month } = data;
-  if (!year || !month) {
-    const fallback = new Date(`${days[0].date}T00:00:00`);
-    year = fallback.getFullYear();
-    month = fallback.getMonth() + 1;
-  }
-  const trackerHeader = document.getElementById("tracker-header");
-  if (trackerHeader) trackerHeader.textContent = `${year}년 ${month}월 완료 기록`;
+  trackerHeaderEl.textContent =
+    isLinked && current.recurring_title
+      ? `${data.year}년 ${data.month}월 · 🔗 ${current.recurring_title}`
+      : `${data.year}년 ${data.month}월`;
 
   trackerGrid.innerHTML = "";
+  if (days.length === 0) return;
+
   const firstDate = new Date(`${days[0].date}T00:00:00`);
   const padding = firstDate.getDay();
   for (let i = 0; i < padding; i++) {
     const empty = document.createElement("span");
-    empty.className = "tracker-cell empty";
+    empty.className = "calendar-day empty";
     trackerGrid.appendChild(empty);
   }
   for (const d of days) {
-    const cell = document.createElement("span");
-    cell.className = "tracker-cell";
-    const rate = d.rate || 0;
-    if (rate >= 100) cell.classList.add("level-5");
-    else if (rate >= 75) cell.classList.add("level-4");
-    else if (rate >= 50) cell.classList.add("level-3");
-    else if (rate >= 25) cell.classList.add("level-2");
-    else if (rate > 0) cell.classList.add("level-1");
-    cell.textContent = d.day;
-    cell.title =
-      d.total > 0
-        ? `${d.date}: ${d.done}/${d.total}개 완료 (${rate}%)`
-        : `${d.date}: 마감된 할 일 없음`;
-    trackerGrid.appendChild(cell);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "calendar-day";
+    if (isLinked) btn.classList.add("tracker-linked");
+    btn.dataset.status = d.status || "";
+    if (d.status === "done") btn.classList.add("tracker-done");
+    else if (d.status === "failed") btn.classList.add("tracker-failed");
+    btn.textContent = d.day;
+    btn.title = d.date;
+    if (!isLinked) {
+      btn.addEventListener("click", () => cycleTrackerEntry(d.date, btn));
+    }
+    trackerGrid.appendChild(btn);
   }
 }
 
-async function renderNews() {
-  const category = newsCategorySelect.value;
-  newsList.innerHTML = "<li class='news-loading'>불러오는 중...</li>";
-  try {
-    const res = await fetch(`/api/news?category=${encodeURIComponent(category)}`);
-    const data = await res.json();
-    const articles = data.articles || [];
-    newsList.innerHTML = "";
-    if (articles.length === 0) {
-      newsList.innerHTML = "<li class='news-empty'>기사를 불러오지 못했습니다.</li>";
-      return;
-    }
-    for (const article of articles) {
-      const li = document.createElement("li");
-      const a = document.createElement("a");
-      a.href = article.link;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.textContent = article.title;
-      li.appendChild(a);
-      newsList.appendChild(li);
-    }
-  } catch (err) {
-    newsList.innerHTML = "<li class='news-empty'>기사를 불러오지 못했습니다.</li>";
+async function cycleTrackerEntry(dateStr, btn) {
+  const current = btn.dataset.status || null;
+  const next = current === "done" ? "failed" : current === "failed" ? null : "done";
+
+  btn.classList.remove("tracker-done", "tracker-failed");
+  if (next === "done") btn.classList.add("tracker-done");
+  else if (next === "failed") btn.classList.add("tracker-failed");
+  btn.dataset.status = next || "";
+
+  await fetch(`/api/trackers/${currentTrackerId}/entries/${dateStr}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: next }),
+  });
+}
+
+trackerSelect.addEventListener("change", () => {
+  currentTrackerId = Number(trackerSelect.value);
+  trackerNewForm.hidden = true;
+  trackerDuplicateForm.hidden = true;
+  renderTracker();
+});
+
+async function populateTrackerLinkOptions() {
+  const res = await fetch("/api/recurring");
+  const rules = await res.json();
+  trackerNewLink.innerHTML = '<option value="">직접 기록 (수동)</option>';
+  for (const rule of rules) {
+    const opt = document.createElement("option");
+    opt.value = rule.id;
+    opt.textContent = rule.title;
+    trackerNewLink.appendChild(opt);
   }
 }
 
-newsCategorySelect.addEventListener("change", () => renderNews());
+trackerNewBtn.addEventListener("click", async () => {
+  trackerDuplicateForm.hidden = true;
+  trackerNewForm.hidden = false;
+  trackerNewName.value = "";
+  trackerNewLink.value = "";
+  await populateTrackerLinkOptions();
+  trackerNewName.focus();
+});
+
+trackerNewCancel.addEventListener("click", () => {
+  trackerNewForm.hidden = true;
+});
+
+trackerNewSave.addEventListener("click", async () => {
+  const name = trackerNewName.value.trim();
+  if (!name) return;
+  const body = { name };
+  if (trackerNewLink.value) body.recurring_rule_id = Number(trackerNewLink.value);
+  const res = await fetch("/api/trackers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const created = await res.json();
+  trackerNewForm.hidden = true;
+  currentTrackerId = created.id;
+  await renderTracker();
+});
+
+trackerDuplicateBtn.addEventListener("click", () => {
+  if (currentTrackerId == null) return;
+  const current = trackers.find((t) => t.id === currentTrackerId);
+  trackerNewForm.hidden = true;
+  trackerDuplicateForm.hidden = false;
+  trackerDuplicateName.value = current ? `${current.name}2` : "";
+  trackerDuplicateCopy.checked = false;
+  trackerDuplicateName.focus();
+});
+
+trackerDuplicateCancel.addEventListener("click", () => {
+  trackerDuplicateForm.hidden = true;
+});
+
+trackerDuplicateSave.addEventListener("click", async () => {
+  const name = trackerDuplicateName.value.trim();
+  if (!name || currentTrackerId == null) return;
+  const res = await fetch(`/api/trackers/${currentTrackerId}/duplicate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, copy_data: trackerDuplicateCopy.checked }),
+  });
+  const created = await res.json();
+  trackerDuplicateForm.hidden = true;
+  currentTrackerId = created.id;
+  await renderTracker();
+});
 
 const notifiedIds = new Set();
 
@@ -980,7 +1094,6 @@ categoryFilter.addEventListener("change", () => fetchTodos());
   await fetchSuggestions();
   await renderCalendar();
   await renderTracker();
-  await renderNews();
   await checkOverdue();
   setInterval(checkOverdue, 60000);
 })();

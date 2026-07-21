@@ -20,7 +20,7 @@ The standout feature is **Korean natural-language quick entry**: type a sentence
 - **Recurring todos** — daily / weekly / biweekly, with an end date and optional exception date ranges (e.g. skip a vacation week). Can be created either through a structured form or the same natural-language input (`매일 9시 약 복용`, `8/3-11/5 격주 공원 산책`)
 - **Search and category filters**
 - **Overdue check** — while the app is open in your browser, it periodically flags anything past its due time that's still unchecked, and lets you mark it done, reschedule it, or snooze it. Optional browser notifications (only fire while the tab is open — there's no background service)
-- **Sidebar** — a month calendar (click a day to filter the list to it), a circular-cell heatmap of the current month's completions (darker = higher completion rate that day, with the date number shown on each cell), and a category-filtered news headline widget (politics/economy/society/IT/sports/world, from 경향신문's public RSS feeds — no API key required)
+- **Sidebar** — a month calendar (click a day to filter the list to it) and any number of habit trackers, each either manually clicked (blank/○/✕) or linked to a recurring todo so its days fill in automatically as you complete them (see "Sidebar" below)
 - **Google Calendar integration (optional)** — read-only OAuth connection that surfaces upcoming calendar events as suggested todos; nothing is imported until you accept it
 
 ## Requirements
@@ -111,8 +111,10 @@ Click "상세 입력" to expand a form with an explicit title field, category pi
 ### Sidebar
 
 - **Calendar**: dots mark days with something due; click a day to filter the list to it, click "전체 보기" to clear the filter.
-- **Tracker**: one cell per day of the current month, labeled with its date number. The color darkens as that day's completion rate (완료 개수 / 마감된 할 일 개수) increases — a day with nothing due stays uncolored.
-- **News**: pick a category (정치/경제/사회/IT/스포츠/세계) from the dropdown to see its 10 most recent headlines from 경향신문's public RSS feed. Click a headline to open the article in a new tab. Headlines are cached for 10 minutes per category to avoid re-fetching on every page load.
+- **Tracker**: create as many named habit trackers as you want (운동, 독서, 금주, ...) via the ＋ button, switch between them with the dropdown. Two modes:
+  - **Manual** (default): click a day to cycle blank → ○ (done, green) → ✕ (failed, red) → blank. Can be duplicated (with or without copying its existing entries) via the ⧉ button.
+  - **Linked to a recurring todo** (pick one from the ＋ form's dropdown, e.g. "매일 운동"): the day's status is computed automatically from whether that day's todo instance is done — ○ once you check it off, auto ✕ once the day passes still unchecked, blank until then. Not manually clickable or duplicable, since its data comes entirely from the linked todos.
+  - Each tracker (either mode) renders as a calendar grid identical in size/spacing/style to the calendar above it.
 
 ### Overdue check
 
