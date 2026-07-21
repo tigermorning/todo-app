@@ -1,6 +1,6 @@
 # Todo App
 
-> **Note:** The app's UI (buttons, labels, messages) is entirely in Korean, and quick-entry parsing only understands Korean sentences. This README is written in English for a wider GitHub audience — the app itself has not been translated.
+> **Note:** The app's UI (buttons, labels, messages) is entirely in Korean, and quick-entry parsing only understands Korean sentences. This README is written in English for a wider GitHub audience — the app itself has not been translated. A Korean-language usage guide is available at [사용법.md](사용법.md).
 
 A personal, local-first Todo app built with Python (FastAPI) and SQLite. It runs entirely on your own computer — there's no hosted backend, no account system, and no server costs, even if you make the code public. Each person who runs it keeps their own local database file.
 
@@ -69,6 +69,8 @@ Open **http://localhost:8000** in your browser. That's it — the SQLite databas
 
 ## How to use it
 
+*(한국어로 보려면 [사용법.md](사용법.md)를 열어 주세요.)*
+
 ### Quick add (top input)
 
 Type a sentence in Korean and press Enter. The parser recognizes:
@@ -107,6 +109,28 @@ Non-Korean speakers can skip natural-language entry entirely and use the date/ti
 Click "상세 입력" to expand a form with an explicit title field, category picker (including "⚙ 카테고리 관리" to rename/delete/edit categories), a date+time picker, and recurrence settings (daily/weekly/biweekly, required end date, optional exception date ranges).
 
 **Note:** the title field here is used exactly as typed — it does not run through the natural-language parser. If you type a description like "수요일 산책, 9월 첫째주 제외" into this title field, it becomes the literal todo title; the date/recurrence/exception fields are the actual controls that determine when it repeats. Natural-language parsing only happens in the quick-add box at the top.
+
+### Categories
+
+Six presets ship out of the box (🏃 운동, 💼 업무, 📚 공부, 🧹 집안일, 👥 약속, 📌 기타), each belonging to one of six color groups. A todo's category badge is colored by its group, so e.g. any category you put in the "운동" (exercise) group always renders the same blue as the built-in 운동 category, letting you see at a glance which todos are exercise-related even across several differently-named categories.
+
+- **Add one**: pick "+ 새 카테고리" from either category dropdown (quick-add's or detailed input's), type a name and optionally an emoji icon, choose a color group, save.
+- **Rename, re-icon, or re-group an existing one**: pick "⚙ 카테고리 관리" from either dropdown to open a management panel listing every category with an editable icon field, name field, and group dropdown, plus a per-row "저장" (save) button.
+- **Delete one**: same management panel, "삭제" (delete) button per row. Todos that used it become uncategorized (their badge shows "카테고리 없음") — they're not deleted.
+- **Change a single todo's category** without opening the management panel: click its category badge in the list and pick from the dropdown that appears in place.
+
+### Search and filtering
+
+The search box above the list filters by title text as you type. The category dropdown next to it filters to one category (or "전체 카테고리" for all). Both apply together and combine with the sidebar calendar's day filter — click a day, then search/filter within it — click "전체 보기" to drop the day filter first if you want to search across every day again.
+
+### Multi-select and bulk actions
+
+Selection starts only from a todo's **title or time text** — clicking there (not the checkbox) selects that one todo and reveals a bulk-actions bar.
+
+- **Shift+click** another todo's title, time, or checkbox to extend a contiguous range from the last-selected item, Explorer/Finder-style.
+- **전체 선택** above the list selects every currently-visible todo (respects the active search/category/day filter) in one click.
+- With one or more selected, the bulk-actions bar lets you **delete** the whole selection or **clear** it (deselect without deleting).
+- **Checking or unchecking any selected item's checkbox applies to the entire selection** — done state, not just that one row. A plain click on a checkbox when nothing is selected still just toggles that single todo, like normal.
 
 ### Sidebar
 
@@ -157,7 +181,8 @@ todo-app/
 │   ├── app.js
 │   └── style.css
 ├── todo.db                    # Created on first run — your data, not committed
-└── PRD.md                     # Full design notes and decision log
+├── PRD.md                     # Full design notes and decision log
+└── 사용법.md                  # Usage guide in Korean
 ```
 
 ## Known limitations
