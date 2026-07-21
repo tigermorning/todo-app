@@ -1,9 +1,12 @@
 venv/
 __pycache__/
 *.pyc
+node_modules/
+.omc/
 
 .env
 todo.db
+todo.db.bak-*
 
 # 구글 캘린더 OAuth 관련 — 실제 비밀값/토큰이 들어있어 항상 제외
 credentials.json
