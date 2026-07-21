@@ -79,6 +79,7 @@ const newCategoryForm = document.getElementById("new-category-form");
 const newCategoryName = document.getElementById("new-category-name");
 const newCategoryIcon = document.getElementById("new-category-icon");
 const newCategoryGroup = document.getElementById("new-category-group");
+const newCategoryParent = document.getElementById("new-category-parent");
 const newCategorySave = document.getElementById("new-category-save");
 const newCategoryCancel = document.getElementById("new-category-cancel");
 
@@ -125,6 +126,18 @@ async function loadGroups() {
   }
 }
 
+function updateParentCategoryOptions() {
+  newCategoryParent.innerHTML = '<option value="">상위 카테고리 없음 (최상위)</option>';
+  for (const c of Object.values(categoriesMap)) {
+    if (!c.parent_id) {
+      const option = document.createElement("option");
+      option.value = c.name;
+      option.textContent = `${c.icon} ${c.name}`;
+      newCategoryParent.appendChild(option);
+    }
+  }
+}
+
 async function loadCategories() {
   const res = await fetch("/api/categories");
   const categories = await res.json();
@@ -136,7 +149,11 @@ async function loadCategories() {
 
   categorySelect.innerHTML = '<option value="">카테고리 없음</option>';
   categoryFilter.innerHTML = '<option value="">전체 카테고리</option>';
-  for (const c of categories) {
+
+  const parents = categories.filter((c) => !c.parent_id);
+  const children = categories.filter((c) => c.parent_id);
+
+  for (const c of parents) {
     const opt1 = document.createElement("option");
     opt1.value = c.name;
     opt1.textContent = `${c.icon} ${c.name}`;
@@ -146,7 +163,21 @@ async function loadCategories() {
     opt2.value = c.name;
     opt2.textContent = `${c.icon} ${c.name}`;
     categoryFilter.appendChild(opt2);
+
+    const subs = children.filter((ch) => ch.parent_name === c.name);
+    for (const sub of subs) {
+      const subOpt1 = document.createElement("option");
+      subOpt1.value = sub.name;
+      subOpt1.textContent = `  └ ${sub.icon} ${sub.name}`;
+      categorySelect.appendChild(subOpt1);
+
+      const subOpt2 = document.createElement("option");
+      subOpt2.value = sub.name;
+      subOpt2.textContent = `  └ ${sub.icon} ${sub.name}`;
+      categoryFilter.appendChild(subOpt2);
+    }
   }
+
   const newOpt = document.createElement("option");
   newOpt.value = "__new__";
   newOpt.textContent = "+ 새 카테고리";
@@ -163,6 +194,7 @@ async function loadCategories() {
   if ([...categoryFilter.options].some((o) => o.value === currentFilterValue)) {
     categoryFilter.value = currentFilterValue;
   }
+  updateParentCategoryOptions();
 }
 
 function formatTimestamp(value) {
@@ -203,6 +235,10 @@ function renderTodos(todos) {
     titleSpan.className = "todo-title";
     titleSpan.textContent = todo.title;
     titleSpan.addEventListener("click", (e) => selectTodo(todo.id, e.shiftKey));
+    titleSpan.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      startEditingTodo(todo, li);
+    });
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "todo-time";
@@ -231,6 +267,93 @@ function renderTodos(todos) {
   }
 }
 
+function startEditingTodo(todo, li) {
+  li.classList.add("editing");
+
+  const existingTitle = li.querySelector(".todo-title");
+  const existingTime = li.querySelector(".todo-time");
+  if (existingTitle) existingTitle.hidden = true;
+  if (existingTime) existingTime.hidden = true;
+
+  const editForm = document.createElement("div");
+  editForm.className = "edit-form";
+
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.className = "edit-title-input";
+  titleInput.value = todo.title;
+
+  const dueDateInput = document.createElement("input");
+  dueDateInput.type = "date";
+  dueDateInput.className = "edit-date-input";
+  if (todo.due_at) {
+    dueDateInput.value = todo.due_at.slice(0, 10);
+  }
+
+  const dueTimeInput = document.createElement("input");
+  dueTimeInput.type = "time";
+  dueTimeInput.className = "edit-time-input";
+  if (todo.due_at) {
+    const timePart = todo.due_at.slice(11, 16);
+    if (timePart) dueTimeInput.value = timePart;
+  }
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "edit-save-btn";
+  saveBtn.textContent = "저장";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "edit-cancel-btn";
+  cancelBtn.textContent = "취소";
+
+  const saveEdit = async () => {
+    const newTitle = titleInput.value.trim();
+    if (!newTitle) {
+      titleInput.focus();
+      return;
+    }
+    let newDueAt = null;
+    if (dueDateInput.value) {
+      newDueAt = `${dueDateInput.value} ${dueTimeInput.value || "00:00"}`;
+    }
+    await fetch(`/api/todos/${todo.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle, due_at: newDueAt }),
+    });
+    await fetchTodos();
+    await renderCalendar();
+  };
+
+  saveBtn.addEventListener("click", saveEdit);
+  cancelBtn.addEventListener("click", async () => {
+    await fetchTodos();
+  });
+  titleInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveEdit();
+    if (e.key === "Escape") fetchTodos();
+  });
+
+  editForm.append(titleInput, dueDateInput, dueTimeInput, saveBtn, cancelBtn);
+
+  const categoryEl = li.querySelector(".category-prompt");
+  if (categoryEl) {
+    li.insertBefore(editForm, categoryEl);
+  } else {
+    const deleteBtn = li.querySelector(".delete-btn");
+    if (deleteBtn) {
+      li.insertBefore(editForm, deleteBtn);
+    } else {
+      li.appendChild(editForm);
+    }
+  }
+
+  titleInput.focus();
+  titleInput.select();
+}
+
 function createCategoryControl(todoId, currentCategory) {
   const wrapper = document.createElement("span");
   wrapper.className = "category-prompt";
@@ -240,7 +363,11 @@ function createCategoryControl(todoId, currentCategory) {
   if (currentCategory) {
     const meta = categoriesMap[currentCategory];
     badge.className = "category-badge";
-    badge.textContent = meta ? `${meta.icon} ${currentCategory}` : `🏷️ ${currentCategory}`;
+    if (meta && meta.parent_name) {
+      badge.textContent = `${meta.icon} ${meta.parent_name} ▸ ${currentCategory}`;
+    } else {
+      badge.textContent = meta ? `${meta.icon} ${currentCategory}` : `🏷️ ${currentCategory}`;
+    }
     badge.style.backgroundColor = meta ? meta.color : "#95A5A6";
   } else {
     badge.className = "category-prompt-btn";
@@ -250,13 +377,25 @@ function createCategoryControl(todoId, currentCategory) {
   const select = document.createElement("select");
   select.hidden = true;
   select.innerHTML = '<option value="">카테고리 없음</option>';
-  for (const name of Object.keys(categoriesMap)) {
-    const meta = categoriesMap[name];
+
+  const parents = Object.values(categoriesMap).filter((c) => !c.parent_id);
+  const children = Object.values(categoriesMap).filter((c) => c.parent_id);
+
+  for (const c of parents) {
     const option = document.createElement("option");
-    option.value = name;
-    option.textContent = `${meta.icon} ${name}`;
-    if (name === currentCategory) option.selected = true;
+    option.value = c.name;
+    option.textContent = `${c.icon} ${c.name}`;
+    if (c.name === currentCategory) option.selected = true;
     select.appendChild(option);
+
+    const subs = children.filter((ch) => ch.parent_name === c.name);
+    for (const sub of subs) {
+      const subOption = document.createElement("option");
+      subOption.value = sub.name;
+      subOption.textContent = `  └ ${sub.icon} ${sub.name}`;
+      if (sub.name === currentCategory) subOption.selected = true;
+      select.appendChild(subOption);
+    }
   }
 
   badge.addEventListener("click", () => {
@@ -1094,8 +1233,11 @@ categorySelect.addEventListener("change", () => {
 
 function renderManageCategories() {
   manageCategoriesList.innerHTML = "";
-  for (const name of Object.keys(categoriesMap)) {
-    const meta = categoriesMap[name];
+
+  const parents = Object.values(categoriesMap).filter((c) => !c.parent_id);
+  const children = Object.values(categoriesMap).filter((c) => c.parent_id);
+
+  for (const c of parents) {
     const li = document.createElement("li");
     li.className = "manage-category-row";
 
@@ -1103,19 +1245,19 @@ function renderManageCategories() {
     iconInput.type = "text";
     iconInput.className = "cat-icon-input";
     iconInput.maxLength = 4;
-    iconInput.value = meta.icon;
+    iconInput.value = c.icon;
 
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.className = "cat-name-input";
-    nameInput.value = name;
+    nameInput.value = c.name;
 
     const groupSelect = document.createElement("select");
     for (const group of groupsCache) {
       const option = document.createElement("option");
       option.value = group.key;
       option.textContent = group.label;
-      if (group.key === meta.group_key) option.selected = true;
+      if (group.key === c.group_key) option.selected = true;
       groupSelect.appendChild(option);
     }
 
@@ -1124,13 +1266,14 @@ function renderManageCategories() {
     saveBtn.className = "cat-save-btn";
     saveBtn.textContent = "저장";
     saveBtn.addEventListener("click", async () => {
-      const res = await fetch(`/api/categories/${encodeURIComponent(name)}`, {
+      const res = await fetch(`/api/categories/${encodeURIComponent(c.name)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: nameInput.value.trim(),
           icon: iconInput.value.trim(),
           group_key: groupSelect.value,
+          parent_name: null,
         }),
       });
       if (!res.ok) {
@@ -1148,10 +1291,10 @@ function renderManageCategories() {
     deleteBtn.className = "cat-delete-btn";
     deleteBtn.textContent = "삭제";
     deleteBtn.addEventListener("click", async () => {
-      if (!confirm(`"${name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`)) {
+      if (!confirm(`"${c.name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`)) {
         return;
       }
-      await fetch(`/api/categories/${encodeURIComponent(name)}`, { method: "DELETE" });
+      await fetch(`/api/categories/${encodeURIComponent(c.name)}`, { method: "DELETE" });
       await loadCategories();
       await fetchTodos();
       renderManageCategories();
@@ -1159,6 +1302,75 @@ function renderManageCategories() {
 
     li.append(iconInput, nameInput, groupSelect, saveBtn, deleteBtn);
     manageCategoriesList.appendChild(li);
+
+    const subs = children.filter((ch) => ch.parent_name === c.name);
+    for (const sub of subs) {
+      const subLi = document.createElement("li");
+      subLi.className = "manage-category-row";
+      subLi.style.paddingLeft = "1.5rem";
+
+      const subIconInput = document.createElement("input");
+      subIconInput.type = "text";
+      subIconInput.className = "cat-icon-input";
+      subIconInput.maxLength = 4;
+      subIconInput.value = sub.icon;
+
+      const subNameInput = document.createElement("input");
+      subNameInput.type = "text";
+      subNameInput.className = "cat-name-input";
+      subNameInput.value = sub.name;
+
+      const subGroupSelect = document.createElement("select");
+      for (const group of groupsCache) {
+        const option = document.createElement("option");
+        option.value = group.key;
+        option.textContent = group.label;
+        if (group.key === sub.group_key) option.selected = true;
+        subGroupSelect.appendChild(option);
+      }
+
+      const subSaveBtn = document.createElement("button");
+      subSaveBtn.type = "button";
+      subSaveBtn.className = "cat-save-btn";
+      subSaveBtn.textContent = "저장";
+      subSaveBtn.addEventListener("click", async () => {
+        const res = await fetch(`/api/categories/${encodeURIComponent(sub.name)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: subNameInput.value.trim(),
+            icon: subIconInput.value.trim(),
+            group_key: subGroupSelect.value,
+            parent_name: c.name,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || "카테고리를 수정하지 못했습니다.");
+          return;
+        }
+        await loadCategories();
+        await fetchTodos();
+        renderManageCategories();
+      });
+
+      const subDeleteBtn = document.createElement("button");
+      subDeleteBtn.type = "button";
+      subDeleteBtn.className = "cat-delete-btn";
+      subDeleteBtn.textContent = "삭제";
+      subDeleteBtn.addEventListener("click", async () => {
+        if (!confirm(`"${sub.name}" 카테고리를 삭제할까요? 이 카테고리를 쓰던 할 일은 카테고리 없음이 됩니다.`)) {
+          return;
+        }
+        await fetch(`/api/categories/${encodeURIComponent(sub.name)}`, { method: "DELETE" });
+        await loadCategories();
+        await fetchTodos();
+        renderManageCategories();
+      });
+
+      subLi.append(subIconInput, subNameInput, subGroupSelect, subSaveBtn, subDeleteBtn);
+      manageCategoriesList.appendChild(subLi);
+    }
   }
 }
 
@@ -1170,6 +1382,7 @@ newCategoryCancel.addEventListener("click", () => {
   newCategoryForm.hidden = true;
   newCategoryName.value = "";
   newCategoryIcon.value = "";
+  newCategoryParent.value = "";
   categorySelect.value = "";
 });
 
@@ -1179,6 +1392,7 @@ newCategorySave.addEventListener("click", async () => {
     newCategoryName.focus();
     return;
   }
+  const parentName = newCategoryParent.value || null;
   const res = await fetch("/api/categories", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1186,6 +1400,7 @@ newCategorySave.addEventListener("click", async () => {
       name,
       icon: newCategoryIcon.value.trim(),
       group_key: newCategoryGroup.value,
+      parent_name: parentName,
     }),
   });
   if (!res.ok) {
@@ -1198,6 +1413,7 @@ newCategorySave.addEventListener("click", async () => {
   newCategoryForm.hidden = true;
   newCategoryName.value = "";
   newCategoryIcon.value = "";
+  newCategoryParent.value = "";
 });
 
 searchInput.addEventListener("input", () => fetchTodos());

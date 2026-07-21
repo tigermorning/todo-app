@@ -1,41 +1,87 @@
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "todo.db"
 
 GROUPS = [
-    {"key": "exercise", "label": "운동", "color": "#4F86F7"},
-    {"key": "work", "label": "업무", "color": "#F5A623"},
-    {"key": "study", "label": "공부", "color": "#9B59B6"},
-    {"key": "chore", "label": "집안일", "color": "#2ECC71"},
-    {"key": "social", "label": "약속", "color": "#FF6B6B"},
-    {"key": "etc", "label": "기타", "color": "#95A5A6"},
+    {"key": "health", "label": "건강", "color": "#4CAF50"},
+    {"key": "selfdev", "label": "자기계발", "color": "#9C27B0"},
+    {"key": "work", "label": "일", "color": "#F5A623"},
+    {"key": "daily", "label": "일상관리", "color": "#607D8B"},
+    {"key": "social", "label": "인간관계", "color": "#FF6B6B"},
+    {"key": "rest", "label": "휴식", "color": "#00BCD4"},
+    {"key": "finance", "label": "재정", "color": "#E91E63"},
+    {"key": "etc", "label": "기타", "color": "#9E9E9E"},
 ]
 GROUP_KEYS = {g["key"] for g in GROUPS}
 
 DEFAULT_CATEGORIES = [
-    ("운동", "🏃", "exercise"),
-    ("업무", "💼", "work"),
-    ("공부", "📚", "study"),
-    ("집안일", "🧹", "chore"),
-    ("약속", "👥", "social"),
-    ("기타", "📌", "etc"),
+    ("건강", "health", None),
+    ("자기계발", "selfdev", None),
+    ("일", "work", None),
+    ("일상관리", "daily", None),
+    ("인간관계", "social", None),
+    ("휴식", "rest", None),
+    ("재정", "finance", None),
+]
+# 자식 카테고리 별도 추가
+DEFAULT_SUBCATEGORIES = [
+    ("운동", "건강", "health"),
+    ("약물관리", "건강", "health"),
+    ("식단", "건강", "health"),
+    ("공부", "자기계발", "selfdev"),
+    ("독서", "자기계발", "selfdev"),
+    ("강의", "자기계발", "selfdev"),
+    ("청소", "일상관리", "daily"),
+    ("빨래", "일상관리", "daily"),
+    ("장보기", "일상관리", "daily"),
+    ("공과금", "일상관리", "daily"),
+    ("행정업무", "일상관리", "daily"),
+    ("데이트", "인간관계", "social"),
+    ("약속", "인간관계", "social"),
+    ("가족", "인간관계", "social"),
+    ("취미", "휴식", "rest"),
+    ("명상", "휴식", "rest"),
+    ("산책", "휴식", "rest"),
+    ("가계부", "재정", "finance"),
+    ("예산", "재정", "finance"),
+    ("투자", "재정", "finance"),
 ]
 
 
 @contextmanager
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+def get_connection(retries=3, retry_delay=0.1):
+    for attempt in range(retries):
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=10)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+            return
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and attempt < retries - 1:
+                time.sleep(retry_delay)
+                continue
+            raise
+
+
+def check_db_integrity():
     try:
-        yield conn
-        conn.commit()
+        with get_connection() as conn:
+            result = conn.execute("PRAGMA integrity_check").fetchone()
+            return result[0] == "ok"
     except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+        return False
 
 
 def init_db():
@@ -69,14 +115,32 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 icon TEXT NOT NULL DEFAULT '🏷️',
-                group_key TEXT NOT NULL DEFAULT 'etc'
+                group_key TEXT NOT NULL DEFAULT 'etc',
+                parent_id INTEGER
             )
             """
         )
-        conn.executemany(
-            "INSERT OR IGNORE INTO categories (name, icon, group_key) VALUES (?, ?, ?)",
-            DEFAULT_CATEGORIES,
-        )
+        cat_columns = {row["name"] for row in conn.execute("PRAGMA table_info(categories)")}
+        if "parent_id" not in cat_columns:
+            conn.execute("ALTER TABLE categories ADD COLUMN parent_id INTEGER")
+
+        def insert_cat(name, group_key, parent_name=None):
+            parent_id = None
+            if parent_name:
+                parent_row = conn.execute(
+                    "SELECT id FROM categories WHERE name = ?", (parent_name,)
+                ).fetchone()
+                if parent_row:
+                    parent_id = parent_row["id"]
+            conn.execute(
+                "INSERT OR IGNORE INTO categories (name, icon, group_key, parent_id) VALUES (?, '', ?, ?)",
+                (name, group_key, parent_id),
+            )
+
+        for name, gkey, _ in DEFAULT_CATEGORIES:
+            insert_cat(name, gkey)
+        for name, parent_name, gkey in DEFAULT_SUBCATEGORIES:
+            insert_cat(name, gkey, parent_name)
 
         conn.execute(
             """

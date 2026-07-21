@@ -1,4 +1,6 @@
 import json
+import signal
+import sys
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -10,17 +12,37 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import calendar_sync
-from db import GROUPS, GROUP_KEYS, get_connection, init_db
+from db import GROUPS, GROUP_KEYS, get_connection, init_db, check_db_integrity
 from nlp import parse_quick_entry, parse_recurring_quick_entry
 from recurring import extend_all_rules, materialize_occurrences
 
 
+def shutdown_handler(signum, frame):
+    print("\n서버를 안전하게 종료합니다...")
+    sys.exit(0)
+
+
+if sys.platform != "win32":
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    signal.signal(signal.SIGINT, shutdown_handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    with get_connection() as conn:
-        extend_all_rules(conn)
+    try:
+        init_db()
+        with get_connection() as conn:
+            extend_all_rules(conn)
+        print("=" * 50)
+        print("  서버가 성공적으로 시작되었습니다.")
+        print("  URL: http://127.0.0.1:8000")
+        print("  종료하려면 Ctrl+C를 누르세요")
+        print("=" * 50)
+    except Exception as e:
+        print(f"서버 시작 중 오류 발생: {e}")
+        raise
     yield
+    print("서버를 안전하게 종료합니다.")
 
 
 app = FastAPI(title="Todo App", lifespan=lifespan)
@@ -93,12 +115,14 @@ class CategoryCreate(BaseModel):
     name: str
     icon: str = ""
     group_key: str
+    parent_name: Optional[str] = None
 
 
 class CategoryUpdate(BaseModel):
     name: str
     icon: str = ""
     group_key: str
+    parent_name: Optional[str] = None
 
 
 class QuickEntryCreate(BaseModel):
@@ -111,6 +135,11 @@ class TodoCategoryUpdate(BaseModel):
 
 class TodoDueAtUpdate(BaseModel):
     due_at: str
+
+
+class TodoUpdate(BaseModel):
+    title: Optional[str] = None
+    due_at: Optional[str] = None
 
 
 class TodoDoneUpdate(BaseModel):
@@ -153,6 +182,21 @@ class TrackerEntryUpdate(BaseModel):
 @app.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/health")
+def health_check():
+    try:
+        with get_connection() as conn:
+            conn.execute("SELECT 1")
+        db_ok = check_db_integrity()
+        return {
+            "status": "ok" if db_ok else "degraded",
+            "db_integrity": db_ok,
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"DB 연결 실패: {str(e)}")
 
 
 @app.get("/api/todos")
@@ -362,10 +406,20 @@ def list_groups():
 @app.get("/api/categories")
 def list_categories():
     with get_connection() as conn:
-        rows = conn.execute("SELECT name, icon, group_key FROM categories ORDER BY id").fetchall()
+        rows = conn.execute(
+            "SELECT name, icon, group_key, parent_id FROM categories ORDER BY id"
+        ).fetchall()
     result = []
     for row in rows:
         group = GROUP_LOOKUP.get(row["group_key"], GROUP_LOOKUP["etc"])
+        parent_name = None
+        if row["parent_id"]:
+            with get_connection() as conn:
+                parent = conn.execute(
+                    "SELECT name FROM categories WHERE id = ?", (row["parent_id"],)
+                ).fetchone()
+                if parent:
+                    parent_name = parent["name"]
         result.append(
             {
                 "name": row["name"],
@@ -373,6 +427,8 @@ def list_categories():
                 "group_key": row["group_key"],
                 "group_label": group["label"],
                 "color": group["color"],
+                "parent_id": row["parent_id"],
+                "parent_name": parent_name,
             }
         )
     return result
@@ -386,6 +442,16 @@ def create_category(category: CategoryCreate):
         raise HTTPException(status_code=400, detail="카테고리 이름은 비어 있을 수 없습니다.")
     if category.group_key not in GROUP_KEYS:
         raise HTTPException(status_code=400, detail="올바르지 않은 그룹입니다.")
+    parent_id = None
+    if category.parent_name:
+        parent_name = category.parent_name.strip()
+        with get_connection() as conn:
+            parent = conn.execute(
+                "SELECT id FROM categories WHERE name = ?", (parent_name,)
+            ).fetchone()
+            if parent is None:
+                raise HTTPException(status_code=404, detail="부모 카테고리를 찾을 수 없습니다.")
+            parent_id = parent["id"]
     with get_connection() as conn:
         existing = conn.execute(
             "SELECT id FROM categories WHERE name = ?", (name,)
@@ -393,8 +459,8 @@ def create_category(category: CategoryCreate):
         if existing:
             raise HTTPException(status_code=400, detail="이미 존재하는 카테고리입니다.")
         conn.execute(
-            "INSERT INTO categories (name, icon, group_key) VALUES (?, ?, ?)",
-            (name, icon, category.group_key),
+            "INSERT INTO categories (name, icon, group_key, parent_id) VALUES (?, ?, ?, ?)",
+            (name, icon, category.group_key, parent_id),
         )
     group = GROUP_LOOKUP[category.group_key]
     return {
@@ -403,6 +469,8 @@ def create_category(category: CategoryCreate):
         "group_key": category.group_key,
         "group_label": group["label"],
         "color": group["color"],
+        "parent_id": parent_id,
+        "parent_name": category.parent_name,
     }
 
 
@@ -414,6 +482,17 @@ def update_category(name: str, update: CategoryUpdate):
         raise HTTPException(status_code=400, detail="카테고리 이름은 비어 있을 수 없습니다.")
     if update.group_key not in GROUP_KEYS:
         raise HTTPException(status_code=400, detail="올바르지 않은 그룹입니다.")
+
+    parent_id = None
+    if update.parent_name:
+        parent_name = update.parent_name.strip()
+        with get_connection() as conn:
+            parent = conn.execute(
+                "SELECT id FROM categories WHERE name = ?", (parent_name,)
+            ).fetchone()
+            if parent is None:
+                raise HTTPException(status_code=404, detail="부모 카테고리를 찾을 수 없습니다.")
+            parent_id = parent["id"]
 
     with get_connection() as conn:
         existing = conn.execute("SELECT id FROM categories WHERE name = ?", (name,)).fetchone()
@@ -427,8 +506,8 @@ def update_category(name: str, update: CategoryUpdate):
                 raise HTTPException(status_code=400, detail="이미 존재하는 카테고리입니다.")
 
         conn.execute(
-            "UPDATE categories SET name = ?, icon = ?, group_key = ? WHERE name = ?",
-            (new_name, icon, update.group_key, name),
+            "UPDATE categories SET name = ?, icon = ?, group_key = ?, parent_id = ? WHERE name = ?",
+            (new_name, icon, update.group_key, parent_id, name),
         )
         if new_name != name:
             conn.execute("UPDATE todos SET category = ? WHERE category = ?", (new_name, name))
@@ -443,6 +522,8 @@ def update_category(name: str, update: CategoryUpdate):
         "group_key": update.group_key,
         "group_label": group["label"],
         "color": group["color"],
+        "parent_id": parent_id,
+        "parent_name": update.parent_name,
     }
 
 
@@ -567,6 +648,39 @@ def set_todo_due_at(todo_id: int, update: TodoDueAtUpdate):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="해당 할 일을 찾을 수 없습니다.")
     return {"id": todo_id, "due_at": update.due_at}
+
+
+@app.patch("/api/todos/{todo_id}")
+def update_todo(todo_id: int, update: TodoUpdate):
+    with get_connection() as conn:
+        existing = conn.execute("SELECT id FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="해당 할 일을 찾을 수 없습니다.")
+
+        updates = []
+        params = []
+        if update.title is not None:
+            title = update.title.strip()
+            if not title:
+                raise HTTPException(status_code=400, detail="title은 비어 있을 수 없습니다.")
+            updates.append("title = ?")
+            params.append(title)
+        if update.due_at is not None:
+            if update.due_at:
+                try:
+                    datetime.strptime(update.due_at, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD HH:MM 이어야 합니다.")
+            updates.append("due_at = ?")
+            params.append(update.due_at or None)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="수정할 항목이 없습니다.")
+
+        params.append(todo_id)
+        conn.execute(f"UPDATE todos SET {', '.join(updates)} WHERE id = ?", params)
+
+    return {"id": todo_id, "title": update.title, "due_at": update.due_at}
 
 
 @app.patch("/api/todos/{todo_id}/toggle")

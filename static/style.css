@@ -1145,3 +1145,75 @@ h1 {
     color: #98989d;
   }
 }
+
+#todo-list li.editing {
+  background: #f8f9fa;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.edit-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.edit-title-input {
+  flex: 2;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #0071e3;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.edit-date-input,
+.edit-time-input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d2d2d7;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.edit-save-btn {
+  padding: 0.4rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: #0071e3;
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.edit-cancel-btn {
+  padding: 0.4rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  #todo-list li.editing {
+    background: #3a3a3c;
+  }
+  .edit-title-input {
+    background: #2c2c2e;
+    border-color: #0071e3;
+    color: #f5f5f7;
+  }
+  .edit-date-input,
+  .edit-time-input {
+    background: #3a3a3c;
+    border-color: #48484a;
+    color: #f5f5f7;
+  }
+  .edit-cancel-btn {
+    background: #48484a;
+    color: #f5f5f7;
+  }
+}
